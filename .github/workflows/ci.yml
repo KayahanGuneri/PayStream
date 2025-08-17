@@ -19,11 +19,13 @@ jobs:
           java-version: "21"
           cache: gradle
 
-      # Windows'ta CRLF gelmiş olabilir; runner'da LF'e çevir + çalıştırılabilir yap
-      - name: Fix Gradle wrapper (permissions & line endings)
+      # Windows'tan CRLF gelirse düzelt + izin ver
+      - name: Prepare Gradle wrapper
         run: |
           sed -i 's/\r$//' gradlew || true
-          chmod +x gradlew
+          chmod +x gradlew || true
+          ls -l gradlew
+          head -n 1 gradlew
 
       - name: Build & Test (monorepo)
-        run: ./gradlew clean test build --no-daemon --stacktrace
+        run: bash ./gradlew clean test build --no-daemon --stacktrace
