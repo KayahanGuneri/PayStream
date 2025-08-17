@@ -1,0 +1,17 @@
+server:
+  port: 9004
+
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres:5432/paystream
+    username: ${POSTGRES_USER:postgres}
+    password: ${POSTGRES_PASSWORD:postgres}
+  kafka:
+    bootstrap-servers: kafka:9092
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: ${EUREKA_URL:http://service-registry:8761/eureka}
+redis:
+  host: redis
+  port: 6379

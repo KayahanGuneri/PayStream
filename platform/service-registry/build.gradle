@@ -1,0 +1,10 @@
+plugins {
+  id 'org.springframework.boot' version '3.3.2'
+  id 'io.spring.dependency-management'
+  id 'java'
+}
+
+dependencies {
+  implementation 'org.springframework.boot:spring-boot-starter-actuator'
+  implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-server'
+}

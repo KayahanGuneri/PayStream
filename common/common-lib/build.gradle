@@ -1,0 +1,4 @@
+plugins { id 'java-library' }
+group = 'com.paystream.common'
+version = '0.0.1-SNAPSHOT'
+dependencies { api 'org.springframework:spring-context' }

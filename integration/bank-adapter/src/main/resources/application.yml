@@ -1,0 +1,9 @@
+spring:
+  application:
+    name: bank-adapter
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus

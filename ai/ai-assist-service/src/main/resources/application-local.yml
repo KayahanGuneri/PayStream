@@ -1,0 +1,16 @@
+server:
+  port: 9010
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8761/eureka
+
+spring:
+  kafka:
+    bootstrap-servers: localhost:29092
+
+weaviate:
+  scheme: http
+  host: localhost
+  port: 8082

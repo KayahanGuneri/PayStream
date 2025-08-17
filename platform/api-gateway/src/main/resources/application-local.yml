@@ -1,0 +1,48 @@
+server:
+  port: 8080
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8761/eureka
+
+spring:
+  cloud:
+    gateway:
+      routes:
+          - id: account
+        uri: http://localhost:9000
+        predicates: [ Path=/account/** ]
+      - id: ledger
+        uri: http://localhost:9001
+        predicates: [ Path=/ledger/** ]
+      - id: transfer
+        uri: http://localhost:9002
+        predicates: [ Path=/transfer/** ]
+      - id: payment
+        uri: http://localhost:9003
+        predicates: [ Path=/payment/** ]
+      - id: fraud
+        uri: http://localhost:9004
+        predicates: [ Path=/fraud/** ]
+      - id: notification
+        uri: http://localhost:9005
+        predicates: [ Path=/notification/** ]
+      - id: reporting
+        uri: http://localhost:9006
+        predicates: [ Path=/reporting/** ]
+      - id: kyc-aml
+        uri: http://localhost:9007
+        predicates: [ Path=/kyc/** ]
+      - id: ai-assist
+        uri: http://localhost:9010
+        predicates: [ Path=/ai/assist/** ]
+      - id: nlp-enrichment
+        uri: http://localhost:9011
+        predicates: [ Path=/ai/nlp/** ]
+      - id: bank-adapter
+        uri: http://localhost:9020
+        predicates: [ Path=/adapter/bank/** ]
+      - id: pos-adapter
+        uri: http://localhost:9021
+        predicates: [ Path=/adapter/pos/** ]

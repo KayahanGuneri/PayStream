@@ -1,0 +1,9 @@
+spring:
+  application:
+    name: ai-assist-service
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus

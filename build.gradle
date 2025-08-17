@@ -1,0 +1,56 @@
+plugins {
+  id 'org.springframework.boot' version '3.3.2' apply false
+  id 'io.spring.dependency-management' version '1.1.5' apply false
+
+}
+
+group = 'com.paystream'
+version = '0.0.1-SNAPSHOT'
+
+allprojects {
+  repositories { mavenCentral() }
+}
+
+subprojects {
+  apply plugin: 'java'
+  apply plugin: 'io.spring.dependency-management'
+
+  java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
+
+  dependencies { testImplementation 'org.springframework.boot:spring-boot-starter-test' }
+
+  tasks.withType(Test).configureEach { useJUnitPlatform() }
+
+  dependencyManagement {
+    imports {
+      mavenBom "org.springframework.boot:spring-boot-dependencies:3.3.2"
+      mavenBom "org.springframework.cloud:spring-cloud-dependencies:2023.0.3"
+    }
+  }
+}
+
+subprojects {
+  apply plugin: 'java'
+  apply plugin: 'io.spring.dependency-management'
+
+  // Spring Boot plugin her serviste ayrı apply edilecek
+  java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
+
+  test {
+    useJUnitPlatform()
+  }
+
+  // Ortak olarak actuator test bağımlılığı:
+  dependencies {
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+  }
+
+  dependencyManagement {
+    imports {
+      mavenBom "org.springframework.boot:spring-boot-dependencies:3.3.2"
+      mavenBom "org.springframework.cloud:spring-cloud-dependencies:2023.0.3"
+    }
+  }
+}
+
+

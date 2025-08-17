@@ -1,0 +1,107 @@
+networks:
+  paystream-net:
+
+services:
+  # ---------- Infra ----------
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-paystream}
+    ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [paystream-net]
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    networks: [paystream-net]
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    depends_on:
+      zookeeper:
+        condition: service_started
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports: ["29092:29092"]
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [paystream-net]
+
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
+    networks: [paystream-net]
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.5
+    command: ["start-dev", "--http-port=8081"]
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+    ports: ["8081:8081"]
+    networks: [paystream-net]
+
+  weaviate:
+    image: semitechnologies/weaviate:1.24.10
+    environment:
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+    ports: ["8082:8080"]
+    networks: [paystream-net]
+
+  # ---------- Apps ----------
+  service-registry:
+    build:
+      context: ../platform/service-registry
+      dockerfile: Dockerfile
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    ports: ["8761:8761"]
+    depends_on: []
+    networks: [paystream-net]
+
+  account-service:
+    build:
+      context: ../core/account-service
+      dockerfile: Dockerfile
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - EUREKA_URL=http://service-registry:8761/eureka
+    ports: ["9000:9000"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      service-registry:
+        condition: service_started
+    networks: [paystream-net]
+
+  api-gateway:
+    build:
+      context: ../platform/api-gateway
+      dockerfile: Dockerfile
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - EUREKA_URL=http://service-registry:8761/eureka
+    ports: ["8080:8080"]
+    depends_on:
+      service-registry:
+        condition: service_started
+      account-service:
+        condition: service_started
+    networks: [paystream-net]

@@ -1,0 +1,11 @@
+server:
+  port: 9020
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: ${EUREKA_URL:http://service-registry:8761/eureka}
+
+spring:
+  kafka:
+    bootstrap-servers: kafka:9092

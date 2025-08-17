@@ -1,0 +1,9 @@
+rootProject.name = 'paystream'
+
+include('platform:api-gateway', 'platform:config-server', 'platform:service-registry')
+include('core:account-service', 'core:ledger-service', 'core:transfer-service',
+        'core:payment-service', 'core:fraud-service', 'core:notification-service',
+        'core:reporting-service', 'core:kyc-aml-service')
+include('ai:ai-assist-service', 'ai:nlp-enrichment-service')
+include('integration:bank-adapter', 'integration:pos-adapter')
+include('common:common-lib')
