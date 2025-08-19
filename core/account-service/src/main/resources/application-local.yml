@@ -2,16 +2,23 @@ server:
   port: 9000
 
 spring:
+  application:
+    name: account-service
   datasource:
     url: jdbc:postgresql://localhost:5432/paystream
     username: postgres
-    password: postgres
-  kafka:
-    bootstrap-servers: localhost:29092
+    password: 123456
+    driver-class-name: org.postgresql.Driver
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  main:
+    web-application-type: servlet
+
 eureka:
   client:
-    serviceUrl:
-      defaultZone: http://localhost:8761/eureka
-redis:
-  host: localhost
-  port: 6379
+    enabled: false
+
+springdoc:
+  api-docs.path: /v3/api-docs
+  swagger-ui.path: /swagger-ui.html
