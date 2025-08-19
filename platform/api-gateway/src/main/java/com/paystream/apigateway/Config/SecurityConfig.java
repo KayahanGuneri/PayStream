@@ -1,4 +1,4 @@
-package com.paystream.apigateway;
+package com.paystream.apigateway.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,10 +11,11 @@ import org.springframework.security.web.server.SecurityWebFilterChain;
 public class SecurityConfig {
     @Bean
     SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
-        // Reaktif güvenlik: CSRF kapalı + hepsi serbest
         return http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
-                .authorizeExchange(ex -> ex.anyExchange().permitAll())
+                .authorizeExchange(ex -> ex
+                        .pathMatchers("/swagger-ui/**","/v3/api-docs/**","/accounts/**","/actuator/**").permitAll()
+                        .anyExchange().permitAll())
                 .build();
     }
 }

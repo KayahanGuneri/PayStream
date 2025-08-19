@@ -1,4 +1,3 @@
 package com.paystream.accountservice.api;
-
-public class AccountResponse {
-}
+import java.util.UUID;
+public record AccountResponse(UUID id, String currency, String status) {}

@@ -17,4 +17,6 @@ spring:
         - id: account
           uri: lb://account-service
           predicates:
-            - Path=/account/**
+            - Path=/accounts/**    # <--- BURASI
+          # filters:
+          #   - StripPrefix=0      # (gerek yok)
