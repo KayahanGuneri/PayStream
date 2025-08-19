@@ -1,14 +1,143 @@
 plugins {
   id 'org.springframework.boot' version '3.3.2'
-  id 'io.spring.dependency-management'
+  id 'io.spring.dependency-management' version '1.1.5'
   id 'java'
+  id 'jacoco' // coverage
+}
+
+group = 'com.paystream'
+version = '0.0.1-SNAPSHOT'
+
+java {
+  toolchain { languageVersion = JavaLanguageVersion.of(21) }
+}
+
+ext {
+  springCloudVersion = '2023.0.4'
+  flywayVersion      = '10.10.0'
+  springdocVersion   = '2.5.0'
+}
+
+repositories { mavenCentral() }
+
+/* ------------------------------------
+ * Source sets: include unit+integration folders
+ * ------------------------------------ */
+sourceSets {
+  test {
+    java {
+      srcDirs = [
+              'src/test/java',                 // optional (classic)
+              'src/test/unit/java',
+              'src/test/integration/java'
+      ]
+    }
+    resources {
+      srcDirs = [
+              'src/test/resources',
+              'src/test/unit/resources',
+              'src/test/integration/resources'
+      ]
+    }
+  }
 }
 
 dependencies {
+  // --- Web & Security (Servlet stack) ---
   implementation 'org.springframework.boot:spring-boot-starter-web'
+  implementation 'org.springframework.boot:spring-boot-starter-security'
   implementation 'org.springframework.boot:spring-boot-starter-actuator'
   implementation 'org.springframework.boot:spring-boot-starter-validation'
-  implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+
+  // --- JDBC (no JPA) ---
+  implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+  runtimeOnly  'org.postgresql:postgresql'
+
+  // --- Discovery ---
   implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
-  runtimeOnly 'org.postgresql:postgresql'
+
+  // --- Flyway & JSON ---
+  implementation "org.flywaydb:flyway-core:${flywayVersion}"
+  implementation "org.flywaydb:flyway-database-postgresql:${flywayVersion}"
+  implementation 'com.fasterxml.jackson.core:jackson-databind'
+
+  // --- OpenAPI (Swagger UI) ---
+  implementation "org.springdoc:springdoc-openapi-starter-webmvc-ui:${springdocVersion}"
+
+  // --- Shared lib ---
+  implementation project(':common:common-lib')
+
+  // --- Configuration metadata (optional) ---
+  annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+
+  // --- Lombok ---
+  compileOnly 'org.projectlombok:lombok'
+  annotationProcessor 'org.projectlombok:lombok'
+  testCompileOnly 'org.projectlombok:lombok'
+  testAnnotationProcessor 'org.projectlombok:lombok'
+
+  // --- Test ---
+  testImplementation 'org.springframework.boot:spring-boot-starter-test'
+  testImplementation 'org.testcontainers:junit-jupiter'
+  testImplementation 'org.testcontainers:postgresql'
 }
+
+dependencyManagement {
+  imports {
+    mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+  }
+}
+
+/* ------------------------------------
+ * Testing & Coverage (JaCoCo)
+ * ------------------------------------ */
+jacoco { toolVersion = '0.8.12' }
+
+tasks.withType(Test).configureEach {
+  useJUnitPlatform()
+  // Helpful for Testcontainers/bytecode-instrumented classes
+  jacoco.includeNoLocationClasses = true
+  jacoco.excludes = ['jdk.internal.*']
+}
+
+// Create HTML/XML reports after tests
+jacocoTestReport {
+  dependsOn test
+  reports {
+    html.required = true   // build/reports/jacoco/test/html/index.html
+    xml.required  = true   // for CI/Sonar
+    csv.required  = false
+  }
+
+  // (Optional) exclude boilerplate from coverage
+  def excludes = [
+          'com/paystream/accountservice/AccountServiceApplication*',
+          'com/paystream/accountservice/infra/config/**',
+          '**/*Request*', '**/*Response*', '**/*Dto*',
+          '**/RowMappers*'
+  ]
+  classDirectories.setFrom(
+          files(classDirectories.files.collect { fileTree(dir: it, exclude: excludes) })
+  )
+}
+
+// Enforce minimum coverage (bundle-level)
+jacocoTestCoverageVerification {
+  violationRules {
+    rule {
+      element = 'BUNDLE'
+      limit {
+        counter = 'LINE'
+        value   = 'COVEREDRATIO'
+        minimum = 0.75 // set your team target here
+      }
+    }
+  }
+}
+
+// Make `gradle check` fail if coverage below threshold
+check.dependsOn jacocoTestCoverageVerification
+
+// Generate report automatically after `test`
+test.finalizedBy jacocoTestReport
+
