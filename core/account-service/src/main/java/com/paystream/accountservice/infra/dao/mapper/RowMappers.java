@@ -1,12 +1,11 @@
-package com.paystream.accountservice.infra.dao;
+package com.paystream.accountservice.infra.dao.mapper;
 
-import com.paystream.accountservice.domain.*;
+import com.paystream.accountservice.domain.account.Account;
+import com.paystream.accountservice.domain.account.AccountBalance;
 import org.springframework.jdbc.core.RowMapper;
 
-import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.time.Instant;
 import java.util.UUID;
 
 public class RowMappers {

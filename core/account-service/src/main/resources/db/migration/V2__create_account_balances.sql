@@ -1,3 +1,4 @@
+-- V2__create_account_balances.sql
 CREATE TABLE IF NOT EXISTS account_balances (
                                                 account_id UUID PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
     current_balance NUMERIC(18,2) NOT NULL DEFAULT 0,

@@ -1,4 +1,4 @@
-package com.paystream.accountservice.api;
+package com.paystream.accountservice.api.account;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;

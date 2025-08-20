@@ -1,4 +1,4 @@
-package com.paystream.accountservice.domain;
+package com.paystream.accountservice.domain.account;
 
 import java.math.BigDecimal;
 import java.time.Instant;

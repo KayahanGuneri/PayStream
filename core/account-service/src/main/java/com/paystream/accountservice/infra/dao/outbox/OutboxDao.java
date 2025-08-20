@@ -1,8 +1,8 @@
-package com.paystream.accountservice.infra.dao;
+package com.paystream.accountservice.infra.dao.outbox;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.paystream.accountservice.domain.OutboxEvent;
+import com.paystream.accountservice.domain.outbox.OutboxEvent;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 

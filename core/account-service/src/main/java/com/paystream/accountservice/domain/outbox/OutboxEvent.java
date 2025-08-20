@@ -1,4 +1,4 @@
-package com.paystream.accountservice.domain;
+package com.paystream.accountservice.domain.outbox;
 
 import java.time.Instant;
 import java.util.Map;
@@ -11,5 +11,5 @@ public record OutboxEvent(
         String eventType,
         Map<String, Object> payload,
         Map<String, String> headers,
-        Instant occurredAt
-) {}
+        Instant occurredAt,
+        Object o) {}

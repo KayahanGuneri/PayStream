@@ -1,8 +1,7 @@
 package com.paystream.accountservice.it;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.paystream.accountservice.infra.dao.AccountDao;
+import com.paystream.accountservice.infra.dao.account.AccountDao;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
