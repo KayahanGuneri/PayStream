@@ -1,4 +1,4 @@
-package com.paystream.accountservice.it;
+package com.paystream.accountservice.it.com.paystream.accountservice.it;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
