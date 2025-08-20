@@ -1,5 +1,5 @@
 package com.paystream.accountservice.it;
-
+import com.paystream.accountservice.infra.dao.outbox.OutboxDao;
 import com.paystream.accountservice.infra.dao.OutboxDao;
 import jakarta.servlet.ServletException;
 import org.junit.jupiter.api.DisplayName;
