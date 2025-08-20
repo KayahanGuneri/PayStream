@@ -1,4 +1,5 @@
-package com.paystream.accountservice.it.com.paystream.accountservice.it;
+package com.paystream.accountservice.it;
+
 import com.paystream.accountservice.infra.dao.outbox.OutboxDao;
 import jakarta.servlet.ServletException;
 import org.junit.jupiter.api.DisplayName;
@@ -57,20 +58,21 @@ class TransactionRollbackIT {
         Mockito.doThrow(new RuntimeException("boom"))
                 .when(outboxDao).insert(any());
 
-        String body = """
-          {"customerId":"11111111-1111-1111-1111-111111111111","currency":"TRY"}
-        """;
 
-        // IMPORTANT: endpoint path must be /accounts (plural)
+        String body = """
+                    {"currency":"TRY"}
+                    """;
+
         assertThatThrownBy(() ->
-                mvc.perform(post("/accounts")
+                mvc.perform(post("/v1/customers/{customerId}/accounts", "11111111-1111-1111-1111-111111111111")
                                 .contentType("application/json")
                                 .header("x-trace-id","it-rollback")
                                 .content(body))
                         .andReturn()
         )
-                .isInstanceOf(ServletException.class)              // MockMvc wraps into ServletException
-                .hasRootCauseInstanceOf(RuntimeException.class);   // our "boom" is the root cause
+                .isInstanceOf(ServletException.class)
+                .hasRootCauseInstanceOf(RuntimeException.class);
+ // our "boom" is the root cause
 
         long accAfter    = jdbc.queryForObject("select count(*) from accounts", Long.class);
         long balAfter    = jdbc.queryForObject("select count(*) from account_balances", Long.class);

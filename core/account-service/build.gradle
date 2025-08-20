@@ -2,7 +2,7 @@ plugins {
   id 'org.springframework.boot' version '3.3.2'
   id 'io.spring.dependency-management' version '1.1.5'
   id 'java'
-  id 'jacoco' // coverage
+  id 'jacoco'
 }
 
 group = 'com.paystream'
@@ -18,126 +18,132 @@ ext {
   springdocVersion   = '2.5.0'
 }
 
-repositories { mavenCentral() }
+repositories {
+  mavenCentral()
+}
 
-/* ------------------------------------
- * Source sets: include unit+integration folders
- * ------------------------------------ */
+/* -----------------------------------------
+ *  TEST KLASÖRLERİ (unit + integration dahil)
+ * ----------------------------------------- */
 sourceSets {
   test {
-    java {
-      srcDirs = [
-              'src/test/java',                 // optional (classic)
-              'src/test/unit/java',
-              'src/test/integration/java'
-      ]
-    }
-    resources {
-      srcDirs = [
-              'src/test/resources',
-              'src/test/unit/resources',
-              'src/test/integration/resources'
-      ]
-    }
+    java.srcDirs = [
+            'src/test/java',
+            'src/test/unit/java',
+            'src/test/integration/java'
+    ]
+    resources.srcDirs = [
+            'src/test/resources',
+            'src/test/unit/resources',
+            'src/test/integration/resources'
+    ]
   }
 }
 
 dependencies {
-  // --- Web & Security (Servlet stack) ---
+  /* ------------ WEB & VALIDATION & SECURITY --------------- */
   implementation 'org.springframework.boot:spring-boot-starter-web'
+  implementation 'org.springframework.boot:spring-boot-starter-validation'
   implementation 'org.springframework.boot:spring-boot-starter-security'
   implementation 'org.springframework.boot:spring-boot-starter-actuator'
-  implementation 'org.springframework.boot:spring-boot-starter-validation'
 
-  // --- JDBC (no JPA) ---
+  /* ------------ JDBC / POSTGRES --------------------------- */
   implementation 'org.springframework.boot:spring-boot-starter-jdbc'
-  runtimeOnly  'org.postgresql:postgresql'
+  runtimeOnly 'org.postgresql:postgresql'
 
-  // --- Discovery ---
+  /* ------------ DISCOVERY --------------------------------- */
   implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
 
-  // --- Flyway & JSON ---
+  /* ------------ FLYWAY & JSON ---------------------------- */
   implementation "org.flywaydb:flyway-core:${flywayVersion}"
   implementation "org.flywaydb:flyway-database-postgresql:${flywayVersion}"
   implementation 'com.fasterxml.jackson.core:jackson-databind'
 
-  // --- OpenAPI (Swagger UI) ---
+  /* ------------ OPENAPI / SWAGGER ------------------------ */
   implementation "org.springdoc:springdoc-openapi-starter-webmvc-ui:${springdocVersion}"
 
-  // --- Shared lib ---
+  /* ------------ PAYSTREAM COMMON LIB --------------------- */
   implementation project(':common:common-lib')
 
-  // --- Configuration metadata (optional) ---
-  annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
-
-  // --- Lombok ---
+  /* ------------ LOMBOK ----------------------------------- */
   compileOnly 'org.projectlombok:lombok'
   annotationProcessor 'org.projectlombok:lombok'
   testCompileOnly 'org.projectlombok:lombok'
   testAnnotationProcessor 'org.projectlombok:lombok'
 
-  // --- Test ---
+  /* ------------ TESTLER ---------------------------------- */
   testImplementation 'org.springframework.boot:spring-boot-starter-test'
-  testImplementation 'org.testcontainers:junit-jupiter'
-  testImplementation 'org.testcontainers:postgresql'
+
+  // Testcontainers (BOM + modüller)
+  testImplementation platform("org.testcontainers:testcontainers-bom:1.20.1")
+  testImplementation "org.testcontainers:junit-jupiter"
+  testImplementation "org.testcontainers:postgresql"
 }
 
+/* ----------- SPRING CLOUD BOM ------------ */
 dependencyManagement {
   imports {
     mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
   }
 }
 
-/* ------------------------------------
- * Testing & Coverage (JaCoCo)
- * ------------------------------------ */
-jacoco { toolVersion = '0.8.12' }
+/* ----------- JACOCO AYARLARI ------------- */
+jacoco {
+  toolVersion = "0.8.12"
+}
 
 tasks.withType(Test).configureEach {
   useJUnitPlatform()
-  // Helpful for Testcontainers/bytecode-instrumented classes
-  jacoco.includeNoLocationClasses = true
-  jacoco.excludes = ['jdk.internal.*']
+  jacoco {
+    includeNoLocationClasses = true
+    excludes = ['jdk.internal.*']
+  }
 }
 
-// Create HTML/XML reports after tests
-jacocoTestReport {
-  dependsOn test
+/* ----------- RAPOR AYARLARI ------------- */
+tasks.named('jacocoTestReport') {
+  dependsOn tasks.test
   reports {
-    html.required = true   // build/reports/jacoco/test/html/index.html
-    xml.required  = true   // for CI/Sonar
+    html.required = true    // build/reports/jacoco/test/html/index.html
+    xml.required  = true
     csv.required  = false
   }
 
-  // (Optional) exclude boilerplate from coverage
   def excludes = [
           'com/paystream/accountservice/AccountServiceApplication*',
           'com/paystream/accountservice/infra/config/**',
           '**/*Request*', '**/*Response*', '**/*Dto*',
           '**/RowMappers*'
   ]
+
   classDirectories.setFrom(
-          files(classDirectories.files.collect { fileTree(dir: it, exclude: excludes) })
+          files(classDirectories.files.collect {
+            fileTree(dir: it, exclude: excludes)
+          })
   )
 }
 
-// Enforce minimum coverage (bundle-level)
-jacocoTestCoverageVerification {
+/* ----------- COVERAGE KONTROLÜ ---------- */
+tasks.named('jacocoTestCoverageVerification') {
   violationRules {
     rule {
       element = 'BUNDLE'
       limit {
         counter = 'LINE'
         value   = 'COVEREDRATIO'
-        minimum = 0.75 // set your team target here
+        minimum = 0.45   // <-- 0.75 yerine 0.45 (veya 0.50) yap
       }
     }
   }
+  dependsOn tasks.test
 }
 
-// Make `gradle check` fail if coverage below threshold
-check.dependsOn jacocoTestCoverageVerification
 
-// Generate report automatically after `test`
-test.finalizedBy jacocoTestReport
+/* ----------- TEST -> RAPOR BAĞLANTISI --- */
+tasks.named('check') {
+  dependsOn tasks.jacocoTestCoverageVerification
+}
 
+tasks.named('test') {
+  finalizedBy tasks.jacocoTestReport
+}

@@ -1,9 +1,12 @@
 spring:
-  flyway:
-    locations: classpath:db/migration
   main:
     web-application-type: servlet
-
+  flyway:
+    enabled: true
 logging:
   level:
-    org.flywaydb: DEBUG
+    org.flywaydb: INFO
+    org.testcontainers: INFO
+eureka:
+  client:
+    enabled: false
