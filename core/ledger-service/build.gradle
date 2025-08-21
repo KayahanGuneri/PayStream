@@ -20,7 +20,20 @@ dependencies {
   // Kafka
   implementation 'org.springframework.kafka:spring-kafka'
 
+
+
+  implementation 'org.flywaydb:flyway-core'
+  implementation 'org.flywaydb:flyway-database-postgresql'
+
+  implementation 'org.postgresql:postgresql'
+
+
+  implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.5.0'
+
+
+
   // Flyway + PG tanıma
+
   implementation 'org.flywaydb:flyway-core'
   implementation 'org.flywaydb:flyway-database-postgresql'
 
@@ -30,7 +43,11 @@ dependencies {
   // Swagger UI / OpenAPI
   implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.5.0'
 
+
+
+
   // Lombok (main + test)
+
   compileOnly 'org.projectlombok:lombok'
   annotationProcessor 'org.projectlombok:lombok'
   testCompileOnly 'org.projectlombok:lombok'
@@ -40,6 +57,8 @@ dependencies {
   testImplementation 'org.springframework.boot:spring-boot-starter-test'
   testImplementation 'org.springframework.kafka:spring-kafka-test'
 }
+
+
 
 tasks.withType(Test).configureEach {
   useJUnitPlatform()
