@@ -25,6 +25,7 @@ EXPOSE 9100
 ENTRYPOINT ["java","-jar","/app/app.jar"]
 
 
+
 FROM gradle:8.10.0-jdk21 AS build
 WORKDIR /home/gradle/src
 COPY . .
@@ -36,4 +37,5 @@ WORKDIR /app
 COPY --from=build /home/gradle/src/core/ledger-service/build/libs/*.jar app.jar
 EXPOSE 9100
 ENTRYPOINT ["java","-jar","/app/app.jar"]
+
 
