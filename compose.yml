@@ -142,25 +142,4 @@ services:
     networks: [paystream]
     profiles: ["core"]
 
-  # Ledger gibi ikinci DB’yi kullanan servis(ler) varsa:
-  # ===== CORE (domain servisleri) =====
-
-  # ledger-service:
-  #   build: ./core/ledger-service
-  #   image: paystream/ledger-service:dev
-  #   container_name: ledger-service
-  #   ports: ["9010:9010"]
-  #   environment:
-  #     SPRING_DATASOURCE_URL: jdbc:postgresql://pg-ledger:5432/postgres
-  #     SPRING_DATASOURCE_USERNAME: postgres
-  #     SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-  #     EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://service-registry:8761/eureka
-  #     SPRING_PROFILES_ACTIVE: dev
-  #   depends_on:
-  #     pg-ledger:
-  #       condition: service_healthy
-  #     service-registry:
-  #       condition: service_started
-  #   networks: [paystream]
-  #   profiles: ["ledger"]
 
