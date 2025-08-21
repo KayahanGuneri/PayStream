@@ -1,0 +1,166 @@
+# compose.yml
+name: paystream  # tek proje adı
+
+networks:
+  paystream:
+
+volumes:
+  ps_pg:
+  ledger_pg:
+  weaviate_data:
+
+services:
+  # ===== INFRA =====
+  postgres:
+    image: postgres:16
+    container_name: ps-postgres
+    ports: ["5433:5432"]
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes: ["ps_pg:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [paystream]
+    profiles: ["core"]
+
+  # sadece bazı haftalarda kullanılan 2. veritabanı (ör. ledger)
+  pg-ledger:
+    image: postgres:16
+    container_name: pg-ledger
+    ports: ["5434:5432"]
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes: ["ledger_pg:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [paystream]
+    profiles: ["ledger"]
+
+  redis:
+    image: redis:7
+    container_name: redis
+    ports: ["6379:6379"]
+    networks: [paystream]
+    profiles: ["core"]
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    container_name: zookeeper
+    ports: ["2181:2181"]
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    networks: [paystream]
+    profiles: ["messaging"]
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: kafka
+    ports: ["29092:29092"]
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    depends_on:
+      zookeeper:
+        condition: service_started
+    networks: [paystream]
+    profiles: ["messaging"]
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.5
+    container_name: keycloak
+    command: ["start-dev", "--http-port=8081"]
+    ports: ["8081:8081"]
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    networks: [paystream]
+    profiles: ["auth"]
+
+  weaviate:
+    image: semitechnologies/weaviate:1.24.10
+    container_name: weaviate
+    ports: ["8082:8080"]
+    environment:
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+      PERSISTENCE_DATA_PATH: "/var/lib/weaviate"
+    volumes: ["weaviate_data:/var/lib/weaviate"]
+    networks: [paystream]
+    profiles: ["ai"]
+
+  # ===== PLATFORM =====
+  service-registry:
+    build: ./platform/service-registry
+    image: paystream/service-registry:dev
+    container_name: service-registry
+    ports: ["8761:8761"]
+    networks: [paystream]
+    profiles: ["core"]
+
+  api-gateway:
+    build: ./platform/api-gateway
+    image: paystream/api-gateway:dev
+    container_name: api-gateway
+    ports: ["8080:8080"]
+    depends_on:
+      service-registry:
+        condition: service_started
+    networks: [paystream]
+    profiles: ["core"]
+
+  # ===== CORE (domain servisleri) =====
+  account-service:
+    build: ./core/account-service
+    image: paystream/account-service:dev
+    container_name: account-service
+    ports: ["9000:9000"]
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/postgres
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://service-registry:8761/eureka
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      # Kafka kullanıyorsan:
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    depends_on:
+      postgres:
+        condition: service_healthy
+      service-registry:
+        condition: service_started
+      redis:
+        condition: service_started
+    networks: [paystream]
+    profiles: ["core"]
+
+  # Ledger gibi ikinci DB’yi kullanan servis(ler) varsa:
+  # ===== CORE (domain servisleri) =====
+
+  # ledger-service:
+  #   build: ./core/ledger-service
+  #   image: paystream/ledger-service:dev
+  #   container_name: ledger-service
+  #   ports: ["9010:9010"]
+  #   environment:
+  #     SPRING_DATASOURCE_URL: jdbc:postgresql://pg-ledger:5432/postgres
+  #     SPRING_DATASOURCE_USERNAME: postgres
+  #     SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+  #     EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://service-registry:8761/eureka
+  #     SPRING_PROFILES_ACTIVE: dev
+  #   depends_on:
+  #     pg-ledger:
+  #       condition: service_healthy
+  #     service-registry:
+  #       condition: service_started
+  #   networks: [paystream]
+  #   profiles: ["ledger"]
+
