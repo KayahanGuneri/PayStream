@@ -8,45 +8,42 @@ group = 'com.paystream'
 version = '0.0.1-SNAPSHOT'
 
 java {
-  toolchain {
-    languageVersion = JavaLanguageVersion.of(21)
-  }
-}
-
-repositories {
-  mavenCentral()
+  toolchain { languageVersion = JavaLanguageVersion.of(21) }
 }
 
 dependencies {
-  // === SPRING BOOT CORE ===
+  // Web + Validation + JDBC
   implementation 'org.springframework.boot:spring-boot-starter-web'
   implementation 'org.springframework.boot:spring-boot-starter-validation'
   implementation 'org.springframework.boot:spring-boot-starter-jdbc'
 
-  // === DATABASE & MIGRATIONS ===
-  implementation 'org.flywaydb:flyway-core'
-  implementation 'org.flywaydb:flyway-database-postgresql'
-  runtimeOnly 'org.postgresql:postgresql'
-
-  // === KAFKA ===
+  // Kafka
   implementation 'org.springframework.kafka:spring-kafka'
 
-  // === SWAGGER / OPENAPI ===
+  // Flyway + PG tanıma
+  implementation 'org.flywaydb:flyway-core'
+  implementation 'org.flywaydb:flyway-database-postgresql'
+
+  // JDBC driver (sadece runtime’da gerekir)
+  runtimeOnly 'org.postgresql:postgresql'
+
+  // Swagger UI / OpenAPI
   implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.5.0'
 
-  // === LOMBOK ===
+  // Lombok (main + test)
   compileOnly 'org.projectlombok:lombok'
   annotationProcessor 'org.projectlombok:lombok'
   testCompileOnly 'org.projectlombok:lombok'
   testAnnotationProcessor 'org.projectlombok:lombok'
 
-  // === TEST BAĞIMLILIKLARI ===
+  // Test
   testImplementation 'org.springframework.boot:spring-boot-starter-test'
-  testImplementation 'org.mockito:mockito-core'
   testImplementation 'org.springframework.kafka:spring-kafka-test'
+
+
   testImplementation 'org.testcontainers:junit-jupiter'
   testImplementation 'org.testcontainers:postgresql'
-  testImplementation 'org.testcontainers:jdbc'
+  testImplementation 'org.testcontainers:jdbc' // (JdbcDatabaseContainer için)
 }
 
 tasks.withType(Test).configureEach {
