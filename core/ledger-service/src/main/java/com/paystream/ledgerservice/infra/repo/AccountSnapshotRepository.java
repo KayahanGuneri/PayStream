@@ -6,6 +6,10 @@ import org.springframework.stereotype.Repository;
 
 import java.util.UUID;
 
+/**
+ * Account + currency başına snapshot tutar.
+ * Idempotency: aynı veya eski ledger_offset geldiyse NO-OP.
+ */
 @Repository
 @RequiredArgsConstructor
 public class AccountSnapshotRepository {
@@ -13,25 +17,23 @@ public class AccountSnapshotRepository {
     private final JdbcTemplate jdbc;
 
     /**
-     * Idempotent: Aynı/eskiden gelen offset'ler etkisiz kalır.
+     * @param accountId   hesap
+     * @param currency    para birimi
+     * @param deltaMinor  eklenecek/çıkarılacak tutar (minor units)
+     * @param ledgerOffset global monotonik offset (olay sırası)
+     *
+     * Eğer row yoksa INSERT, varsa yalnızca newOffset > last_offset ise UPDATE.
      */
-    public void applyDelta(UUID accountId, String currency, long deltaMinor, long offset) {
+    public void applyDelta(UUID accountId, String currency, long deltaMinor, long ledgerOffset) {
         final String sql = """
-          INSERT INTO account_snapshots (account_id, currency, balance_minor, last_offset)
-          VALUES (?, ?, ?, ?)
-          ON CONFLICT (account_id, currency) DO UPDATE
-            SET balance_minor = CASE
-                                   WHEN EXCLUDED.last_offset > account_snapshots.last_offset
-                                     THEN account_snapshots.balance_minor + EXCLUDED.balance_minor
-                                   ELSE account_snapshots.balance_minor
-                                END,
-                last_offset   = GREATEST(account_snapshots.last_offset, EXCLUDED.last_offset),
-                updated_at    = CASE
-                                   WHEN EXCLUDED.last_offset > account_snapshots.last_offset
-                                     THEN now()
-                                   ELSE account_snapshots.updated_at
-                                END
-        """;
-        jdbc.update(sql, accountId, currency, deltaMinor, offset);
+            INSERT INTO account_snapshots(account_id, currency, balance_minor, last_offset)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT (account_id, currency)
+            DO UPDATE SET
+                balance_minor = account_snapshots.balance_minor + EXCLUDED.balance_minor,
+                last_offset   = EXCLUDED.last_offset
+            WHERE account_snapshots.last_offset < EXCLUDED.last_offset
+            """;
+        jdbc.update(sql, accountId, currency, deltaMinor, ledgerOffset);
     }
 }
