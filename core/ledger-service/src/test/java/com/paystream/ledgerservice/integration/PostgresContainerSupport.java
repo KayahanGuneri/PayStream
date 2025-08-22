@@ -19,13 +19,13 @@ public abstract class PostgresContainerSupport {
                     .withPassword("postgres");
 
     @DynamicPropertySource
-    static void configureProperties(DynamicPropertyRegistry registry) {
-        // Datasource ayarları
+    static void configure(DynamicPropertyRegistry registry) {
+        // Ana datasource
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
 
-        // Flyway aynı DB'yi kullansın
+        // Flyway da aynı container'ı kullansın
         registry.add("spring.flyway.url", POSTGRES::getJdbcUrl);
         registry.add("spring.flyway.user", POSTGRES::getUsername);
         registry.add("spring.flyway.password", POSTGRES::getPassword);
