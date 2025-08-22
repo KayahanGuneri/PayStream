@@ -1,6 +1,12 @@
 spring:
   application:
     name: ledger-service
+
+  datasource:
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+    url: jdbc:tc:postgresql:16:///ledger?TC_TMPFS=/var/lib/postgresql/data:rw
+    username: test
+    password: test
   jpa:
     open-in-view: false
     hibernate:
@@ -26,3 +32,5 @@ ledger:
   snapshot:
     consumer:
       enabled: false
+
+
