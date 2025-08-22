@@ -17,3 +17,11 @@ logging:
   level:
     root: INFO
     org.springframework.jdbc.core: INFO
+
+ledger:
+  outbox:
+    relay:
+      enabled: true
+  snapshot:
+    consumer:
+      enabled: true

@@ -37,6 +37,4 @@ public class LedgerEntryRepository {
         return offset;
     }
 
-    // Example read API (handy for reconciliation or queries)
-    // public List<LedgerEntry> findByAccountAndCurrency(UUID accountId, String currency) { ... rowMapper ... }
 }
