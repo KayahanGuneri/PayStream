@@ -4,21 +4,19 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
-@ActiveProfiles("test") // application-test.yml aktif
+@Testcontainers
+@ActiveProfiles("test")
 public abstract class PostgresContainerSupport {
 
-    // JUnit ile değil, biz doğrudan yöneteceğiz
+    @Container
     protected static final PostgreSQLContainer<?> POSTGRES =
             new PostgreSQLContainer<>("postgres:16")
                     .withDatabaseName("paystream")
                     .withUsername("postgres")
                     .withPassword("postgres");
-
-    // >>> ERKEN BAŞLATMA: class yüklenir yüklenmez container başlasın
-    static {
-        POSTGRES.start();
-    }
 
     @DynamicPropertySource
     static void props(DynamicPropertyRegistry r) {
@@ -27,10 +25,14 @@ public abstract class PostgresContainerSupport {
         r.add("spring.datasource.password", POSTGRES::getPassword);
         r.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
 
-        // Flyway ve yan etkileri testte aç/kapat
         r.add("spring.flyway.enabled", () -> true);
-        r.add("spring.task.scheduling.enabled", () -> "false");
+
+        // Testte dış yan etkileri kapat
         r.add("ledger.outbox.relay.enabled", () -> false);
         r.add("ledger.snapshot.consumer.enabled", () -> false);
+
+        // Kafka Admin’in testte topic kontrolü yapmasını tamamen kapat (CI’de faydalı)
+        r.add("spring.autoconfigure.exclude",
+                () -> "org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration");
     }
 }
