@@ -7,7 +7,7 @@ import com.paystream.ledgerservice.domain.LedgerEntry;
 import com.paystream.ledgerservice.domain.OutboxRecord;
 import com.paystream.ledgerservice.infra.repo.LedgerEntryRepository;
 import com.paystream.ledgerservice.infra.repo.OutboxRepository;
-import jakarta.validation.ValidationException;
+// import jakarta.validation.ValidationException; // <-- KALDIRILDI
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,10 +25,10 @@ public class LedgerTransactionAppService {
 
     @Transactional
     public void bookTransaction(BookTransactionRequest req) {
-        // --- 1) Validate the business invariants ---
+        // --- 1) Keeping business rules in order ---
         validate(req);
 
-        // --- 2) Insert entries (append-only) and collect assigned offsets ---
+        // --- 2) Append records (append-only) and sum the given offsets ---
         int seq = 0;
         for (BookTransactionRequest.Entry line : req.getEntries()) {
             LedgerEntry e = LedgerEntry.builder()
@@ -40,10 +40,9 @@ public class LedgerTransactionAppService {
                     .amountMinor(line.getAmountMinor())
                     .build();
 
-            // Insert returns the global ledger offset (assigned by DB sequence)
-            long offset = entryRepo.insert(e);
+            long offset = entryRepo.insert(e); // DB sequence’den global offset
 
-            // --- 3) Create one outbox row PER ENTRY (keyed by accountId) ---
+            // --- 3) Create outbox row for each ENTRY (key = accountId) ---
             Map<String, Object> payload = new LinkedHashMap<>();
             payload.put("eventId", UUID.randomUUID().toString());
             payload.put("txId", e.getTxId().toString());
@@ -62,33 +61,37 @@ public class LedgerTransactionAppService {
                         .payload(om.writeValueAsString(payload))
                         .build());
             } catch (JsonProcessingException ex) {
-                // Convert to a runtime exception to rollback the whole TX
                 throw new IllegalStateException("Failed to serialize event payload", ex);
             }
         }
-        // Commit => both entries and outbox rows are durable
+
     }
 
-    // Basic invariants: same currency, non-zero amounts, sum == 0
+    // Basic invariants: at least one row, single currency, non-0 amounts, total = 0
     private void validate(BookTransactionRequest req) {
-        if (req.getEntries().isEmpty()) {
-            throw new ValidationException("At least one entry is required");
+        if (req == null || req.getEntries() == null || req.getEntries().isEmpty()) {
+            throw new IllegalArgumentException("At least one entry is required");
         }
-        // All currencies must match (single-currency transaction)
+
+        // All currency fields must be the same (single currency transaction)
         String currency = req.getEntries().get(0).getCurrency();
-        boolean sameCurrency = req.getEntries().stream().allMatch(e -> Objects.equals(currency, e.getCurrency()));
+        boolean sameCurrency = req.getEntries().stream()
+                .allMatch(e -> Objects.equals(currency, e.getCurrency()));
         if (!sameCurrency) {
-            throw new ValidationException("All entries must have the same currency");
+            throw new IllegalArgumentException("All entries must have the same currency");
         }
-        // No zero amounts
+
+        // No amount should be 0
         boolean nonZero = req.getEntries().stream().allMatch(e -> e.getAmountMinor() != 0);
         if (!nonZero) {
-            throw new ValidationException("Entry amount must be non-zero");
+            throw new IllegalArgumentException("Entry amount must be non-zero");
         }
-        // Sum must be zero (double-entry)
-        long sum = req.getEntries().stream().collect(Collectors.summingLong(BookTransactionRequest.Entry::getAmountMinor));
+
+        // Double-entry accounting: signed sum must be 0
+        long sum = req.getEntries().stream()
+                .collect(Collectors.summingLong(BookTransactionRequest.Entry::getAmountMinor));
         if (sum != 0) {
-            throw new ValidationException("Signed amounts must sum to zero");
+            throw new IllegalArgumentException("Signed amounts must sum to zero");
         }
     }
 }

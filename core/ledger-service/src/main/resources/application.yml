@@ -5,11 +5,7 @@ spring:
   application:
     name: ledger-service
   datasource:
-
-    url: ${LEDGER_DB_URL:jdbc:postgresql://localhost:5434/ledgerdb}
-
     url: ${LEDGER_DB_URL:jdbc:postgresql://localhost:5433/ledgerdb}
-
     username: ${LEDGER_DB_USER:postgres}
     password: ${LEDGER_DB_PASS:postgres}
   flyway:
