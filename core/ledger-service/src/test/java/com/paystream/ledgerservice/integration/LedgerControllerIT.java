@@ -1,11 +1,14 @@
 package com.paystream.ledgerservice.integration;
 
+import com.paystream.ledgerservice.config.TestKafkaConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.kafka.core.KafkaTemplate;
 
@@ -15,6 +18,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@ActiveProfiles("test")
+@Import(TestKafkaConfig.class)
 class LedgerControllerIT extends PostgresContainerSupport {
 
     @Autowired MockMvc mvc;
