@@ -10,6 +10,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers
 @ActiveProfiles("test")
 public abstract class PostgresContainerSupport {
+    static final PostgreSQLContainer<?> POSTGRES =
 
     @Container
     protected static final PostgreSQLContainer<?> POSTGRES =
@@ -18,7 +19,15 @@ public abstract class PostgresContainerSupport {
                     .withUsername("postgres")
                     .withPassword("postgres");
 
+    static {
+        POSTGRES.start();
+    }
+
     @DynamicPropertySource
+    static void register(DynamicPropertyRegistry r) {
+        r.add("spring.datasource.url", POSTGRES::getJdbcUrl);
+        r.add("spring.datasource.username", POSTGRES::getUsername);
+        r.add("spring.datasource.password", POSTGRES::getPassword);
     static void configure(DynamicPropertyRegistry registry) {
         // Ana datasource
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
@@ -31,3 +40,4 @@ public abstract class PostgresContainerSupport {
         registry.add("spring.flyway.password", POSTGRES::getPassword);
     }
 }
+

@@ -1,5 +1,6 @@
 package com.paystream.ledgerservice.integration;
 
+import com.paystream.ledgerservice.config.TestKafkaConfig;
 import com.paystream.ledgerservice.domain.LedgerEntry;
 import com.paystream.ledgerservice.domain.OutboxRecord;
 import com.paystream.ledgerservice.infra.repo.LedgerEntryRepository;
@@ -7,6 +8,8 @@ import com.paystream.ledgerservice.infra.repo.OutboxRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
 
 
 import java.util.UUID;
@@ -14,6 +17,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
+@ActiveProfiles("test")
+@Import(TestKafkaConfig.class)
 class LedgerRepositoryIT extends PostgresContainerSupport {
 
     @Autowired LedgerEntryRepository ledgerRepo;

@@ -8,62 +8,46 @@ group = 'com.paystream'
 version = '0.0.1-SNAPSHOT'
 
 java {
-  toolchain { languageVersion = JavaLanguageVersion.of(21) }
+  toolchain {
+    languageVersion = JavaLanguageVersion.of(21)
+  }
+}
+
+repositories {
+  mavenCentral()
 }
 
 dependencies {
-  // Web + Validation + JDBC
+  // === SPRING BOOT CORE ===
   implementation 'org.springframework.boot:spring-boot-starter-web'
   implementation 'org.springframework.boot:spring-boot-starter-validation'
   implementation 'org.springframework.boot:spring-boot-starter-jdbc'
 
-  // Kafka
-  implementation 'org.springframework.kafka:spring-kafka'
-
-
-
+  // === DATABASE & MIGRATIONS ===
   implementation 'org.flywaydb:flyway-core'
   implementation 'org.flywaydb:flyway-database-postgresql'
-
-  implementation 'org.postgresql:postgresql'
-
-
-  implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.5.0'
-
-
-
-  // Flyway + PG tanıma
-
-  implementation 'org.flywaydb:flyway-core'
-  implementation 'org.flywaydb:flyway-database-postgresql'
-
-  // JDBC driver (sadece runtime’da gerekir)
   runtimeOnly 'org.postgresql:postgresql'
 
-  // Swagger UI / OpenAPI
+  // === KAFKA ===
+  implementation 'org.springframework.kafka:spring-kafka'
+
+  // === SWAGGER / OPENAPI ===
   implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.5.0'
 
-
-
-
-  // Lombok (main + test)
-
+  // === LOMBOK ===
   compileOnly 'org.projectlombok:lombok'
   annotationProcessor 'org.projectlombok:lombok'
   testCompileOnly 'org.projectlombok:lombok'
   testAnnotationProcessor 'org.projectlombok:lombok'
 
-  // Test
+  // === TEST BAĞIMLILIKLARI ===
   testImplementation 'org.springframework.boot:spring-boot-starter-test'
+  testImplementation 'org.mockito:mockito-core'
   testImplementation 'org.springframework.kafka:spring-kafka-test'
-
-
   testImplementation 'org.testcontainers:junit-jupiter'
   testImplementation 'org.testcontainers:postgresql'
-  testImplementation 'org.testcontainers:jdbc' // (JdbcDatabaseContainer için)
+  testImplementation 'org.testcontainers:jdbc'
 }
-
-
 
 tasks.withType(Test).configureEach {
   useJUnitPlatform()
