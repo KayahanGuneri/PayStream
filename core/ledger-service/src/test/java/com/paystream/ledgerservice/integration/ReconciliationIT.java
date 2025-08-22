@@ -4,6 +4,7 @@ import com.paystream.ledgerservice.config.TestKafkaConfig;
 import com.paystream.ledgerservice.domain.LedgerEntry;
 import com.paystream.ledgerservice.infra.repo.AccountSnapshotRepository;
 import com.paystream.ledgerservice.infra.repo.LedgerEntryRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -20,6 +21,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ActiveProfiles("test")
 @Import(TestKafkaConfig.class)
 class ReconciliationIT extends PostgresContainerSupport {
+
+    @BeforeEach
+    void cleanDb() {
+        // Sıra önemli değil, FK yoksa TRUNCATE yeterli
+        jdbc.update("TRUNCATE TABLE account_snapshots");
+        jdbc.update("TRUNCATE TABLE ledger_entries");
+    }
+
 
     @Autowired LedgerEntryRepository ledgerRepo;
     @Autowired AccountSnapshotRepository snapshots;
@@ -82,6 +91,33 @@ class ReconciliationIT extends PostgresContainerSupport {
         """, Long.class, accA, TRY);
         assertThat(after).isEqualTo(before);
     }
+
+    @Test
+    void out_of_order_event_is_noop() {
+        UUID acc = UUID.randomUUID();
+        String TRY = "TRY";
+
+        long o1 = insert(acc, TRY, +100, 0); // offset = o1
+        long o2 = insert(acc, TRY, +1000, 1); // offset = o2
+        long o3 = insert(acc, TRY, +50, 2);   // offset = o3  (o1 < o2 < o3)
+
+        // Snapshot uygulama sırasını karıştır: o1 → o3 → o2
+        snapshots.applyDelta(acc, TRY, +100,  o1); // balance: 100,  offset=o1
+        snapshots.applyDelta(acc, TRY, +50,   o3); // balance: 150,  offset=o3
+        snapshots.applyDelta(acc, TRY, +1000, o2); // o2 < o3 → NO-OP
+
+        Long bal = jdbc.queryForObject("""
+        SELECT balance_minor FROM account_snapshots
+        WHERE account_id=? AND currency=?""", Long.class, acc, TRY);
+        Long off = jdbc.queryForObject("""
+        SELECT as_of_ledger_offset FROM account_snapshots
+        WHERE account_id=? AND currency=?""", Long.class, acc, TRY);
+
+        assertThat(bal).isEqualTo(150L); // 100 + 50; o2 NO-OP
+        assertThat(off).isEqualTo(o3);
+    }
+
+
 
     private long insert(UUID accountId, String currency, long amountMinor, int txSeq) {
         LedgerEntry e = LedgerEntry.builder()
