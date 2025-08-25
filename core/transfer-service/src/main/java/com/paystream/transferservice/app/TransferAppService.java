@@ -88,4 +88,9 @@ public class TransferAppService {
         // 8) Return response
         return new TransferResponse(transferId, TransferStatus.COMPLETED, ledgerTxId);
     }
+
+package com.paystream.transferservice.app;
+
+public class TransferAppService {
+
 }
