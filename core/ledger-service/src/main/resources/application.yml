@@ -4,14 +4,8 @@ server:
 spring:
   application:
     name: ledger-service
-  datasource:
-    url: ${LEDGER_DB_URL:jdbc:postgresql://localhost:5433/ledgerdb}
-    username: ${LEDGER_DB_USER:postgres}
-    password: ${LEDGER_DB_PASS:postgres}
   flyway:
     enabled: true
-  kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
 
 logging:
   level:
@@ -19,14 +13,5 @@ logging:
     org.springframework.jdbc.core: INFO
 
 ledger:
-  outbox:
-    relay:
-      enabled: true
-  snapshot:
-    consumer:
-      enabled: true
-
-
-
-  profiles:
-    active: test
+  outbox.relay.enabled: true
+  snapshot.consumer.enabled: true
