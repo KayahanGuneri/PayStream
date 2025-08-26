@@ -53,4 +53,12 @@ subprojects {
   }
 }
 
+// build.gradle (root veya ledger-service modülü)
+allprojects {
+  tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+  }
+}
+
+
 

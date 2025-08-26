@@ -16,11 +16,21 @@ public record CreateTransferRequest (
     UUID sourceAccountId,   //Must be valid UUID
 
     @NotNull
+
+    UUID destAccountId,    //Must be valid UUID
+
     UUID destACcountId,    //Must be valid UUID
+
 
     @NotBlank
     String currency,       //e.g. "TRY"
 
     @Positive
     long amountMinor      //positive amount in minor units
+
+){
+
+}
+
 ){}
+
