@@ -6,8 +6,8 @@ spring:
     name: account-service
   datasource:
     url: jdbc:postgresql://localhost:5432/paystream
-    username: postgres
-    password: 123456
+    username: ${POSTGRES_USER:postgres}
+    password: ${POSTGRES_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
   flyway:
     enabled: true
