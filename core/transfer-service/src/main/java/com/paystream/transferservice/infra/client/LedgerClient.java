@@ -40,4 +40,9 @@ public class LedgerClient {
 
         return resp.getStatusCode().is2xxSuccessful() || resp.getStatusCode() == HttpStatus.NO_CONTENT;
     }
+
+package com.paystream.transferservice.infra.client;
+
+public class LedgerClient {
+
 }

@@ -39,4 +39,9 @@ public class SwaggerConfig {
                         .license(new License().name("Apache-2.0")))
                 ;
     }
+
+package com.paystream.transferservice.infra.config;
+
+public class SwaggerConfig {
+
 }

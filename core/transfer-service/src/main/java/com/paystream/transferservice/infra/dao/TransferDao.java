@@ -47,4 +47,9 @@ public class TransferDao {
         jdbc.update("UPDATE transfers SET status=?, ledger_tx_id=?, updated_at=now() WHERE id=?",
                 TransferStatus.COMPLETED.name(), ledgerTxId, id);
     }
+
+package com.paystream.transferservice.infra.dao;
+
+public class TransferDao {
+
 }

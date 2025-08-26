@@ -1,5 +1,6 @@
 package com.paystream.transferservice.infra.config;
 
+
 import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,4 +21,7 @@ public class EurekaConfig {
     public RestClient.Builder restClientBuilder() {
         return RestClient.builder();
     }
+
+public class EurekaConfig {
+
 }

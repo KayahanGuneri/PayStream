@@ -13,14 +13,22 @@ services:
   postgres:
     image: postgres:16
     container_name: ps-postgres
+
     ports: ["5433:5432"]   # host 5433 -> container 5432
+
+    ports: ["5433:5432"]  # host 5433 -> container 5432
+
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: paystream
     volumes:
       - pg_data:/var/lib/postgresql/data
+
       - ./docker/initdb:/docker-entrypoint-initdb.d   # e.g., create-ledgerdb.sql
+
+      - ./docker/initdb:/docker-entrypoint-initdb.d  # e.g., create-ledgerdb.sql
+
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d paystream"]
       interval: 5s
@@ -164,6 +172,7 @@ services:
     ports: ["9100:9100"]
     networks: [paystream]
     profiles: ["services"]
+
 
   transfer-service:
     build:
