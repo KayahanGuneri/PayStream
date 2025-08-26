@@ -1,9 +1,18 @@
+server:
+  port: 8761
+
 spring:
   application:
     name: service-registry
 
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,prometheus
+eureka:
+  client:
+    # Eureka SERVER olduğu için client davranışını kapat
+    register-with-eureka: false
+    fetch-registry: false
+    # (opsiyonel) defaultZone tanımlamana gerek yok; tanımlarsan da kendini işaret etmemeli
+    service-url:
+      defaultZone: http://service-registry:8761/eureka/
+  instance:
+    # Container içinden erişilecek hostname
+    hostname: service-registry

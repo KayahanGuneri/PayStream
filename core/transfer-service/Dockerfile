@@ -1,6 +1,12 @@
+# ---------- build stage ----------
+FROM gradle:8.10.0-jdk21 AS build
+WORKDIR /workspace
+COPY . .
+RUN gradle :core:transfer-service:clean :core:transfer-service:bootJar -x test --no-daemon
+
+# ---------- runtime stage ----------
 FROM eclipse-temurin:21-jre
 WORKDIR /app
-ARG JAR=build/libs/*.jar
-COPY ${JAR} app.jar
-EXPOSE 9002
+COPY --from=build /workspace/core/transfer-service/build/libs/*.jar /app/app.jar
+EXPOSE 8085
 ENTRYPOINT ["java","-jar","/app/app.jar"]

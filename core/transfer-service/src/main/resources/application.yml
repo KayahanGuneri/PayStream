@@ -1,9 +1,28 @@
+server:
+  port: 8085
+
 spring:
   application:
     name: transfer-service
+  datasource:
+    url: jdbc:postgresql://ps-postgres:5432/paystream  # same Docker network: paystream
+    username: ${POSTGRES_USER:postgres}
+    password: ${POSTGRES_PASSWORD:postgres}
+  flyway:
+    enabled: true
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
 
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,prometheus
+eureka:
+  client:
+    service-url:
+      defaultZone: http://service-registry:8761/eureka/
+
+springdoc:
+  api-docs.enabled: true
+  swagger-ui.path: /swagger-ui.html
+
+# Internal Ledger base URL (Docker DNS resolves service name)
+ledger:
+  base-url: http://ledger-service:8080
