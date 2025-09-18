@@ -21,34 +21,12 @@ public class AccountSnapshotRepository {
      * @param accountId    hesap ID
      * @param currency     para birimi
      * @param deltaMinor   eklenecek/çıkarılacak tutar (minor units)
-
      * @param ledgerOffset global monotonik offset (olay sırası)
      *
      * Eğer row yoksa INSERT, varsa yalnızca newOffset > existingOffset ise UPDATE yapılır.
      */
     public void applyDelta(UUID accountId, String currency, long deltaMinor, long ledgerOffset) {
         final String sql = """
-            INSERT INTO account_snapshots(account_id, currency, balance_minor, as_of_ledger_offset)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT (account_id, currency)
-            DO UPDATE SET
-                balance_minor       = account_snapshots.balance_minor + EXCLUDED.balance_minor,
-                as_of_ledger_offset = EXCLUDED.as_of_ledger_offset
-            WHERE account_snapshots.as_of_ledger_offset IS NULL
-               OR account_snapshots.as_of_ledger_offset < EXCLUDED.as_of_ledger_offset
-            """;
-
-     * @param accountId   hesap
-     * @param currency    para birimi
-     * @param deltaMinor  eklenecek/çıkarılacak tutar (minor units)
-
-     * @param ledgerOffset global monotonik offset (olay sırası)
-     *
-     * Eğer row yoksa INSERT, varsa yalnızca newOffset > existingOffset ise UPDATE yapılır.
-     */
-    public void applyDelta(UUID accountId, String currency, long deltaMinor, long ledgerOffset) {
-        final String sql = """
-
                 INSERT INTO account_snapshots(account_id, currency, balance_minor, as_of_ledger_offset)
                 VALUES (?, ?, ?, ?)
                 ON CONFLICT (account_id, currency)
@@ -58,17 +36,5 @@ public class AccountSnapshotRepository {
                 WHERE account_snapshots.as_of_ledger_offset IS NULL
                    OR account_snapshots.as_of_ledger_offset < EXCLUDED.as_of_ledger_offset
                 """;
-
-            INSERT INTO account_snapshots(account_id, currency, balance_minor, last_offset)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT (account_id, currency)
-            DO UPDATE SET
-                balance_minor = account_snapshots.balance_minor + EXCLUDED.balance_minor,
-                last_offset   = EXCLUDED.last_offset
-            WHERE account_snapshots.last_offset < EXCLUDED.last_offset
-            """;
-
-        jdbc.update(sql, accountId, currency, deltaMinor, ledgerOffset);
-
     }
 }

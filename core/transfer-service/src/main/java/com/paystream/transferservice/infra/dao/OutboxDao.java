@@ -17,9 +17,4 @@ public class OutboxDao {
             VALUES (?,?,?,?, 'NEW')
         """, aggregateType, aggregateId, keyAccountId, payloadJson);
     }
-
-package com.paystream.transferservice.infra.dao;
-
-public class OutboxDao {
-
 }

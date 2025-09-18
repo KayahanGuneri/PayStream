@@ -1,6 +1,3 @@
-
-
-
 // Minimal domain entity for persistence + business transitions
 package com.paystream.transferservice.domain;
 
@@ -31,10 +28,4 @@ public class Transfer {
         t.status = TransferStatus.PENDING;
         return t;
     }
-
-
-package com.paystream.transferservice.domain;
-
-public class Transfer {
-
 }

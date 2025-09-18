@@ -1,7 +1,6 @@
 package com.paystream.ledgerservice.integration;
 
 import com.paystream.ledgerservice.config.TestKafkaConfig;
-
 import com.paystream.ledgerservice.domain.LedgerEntry;
 import com.paystream.ledgerservice.infra.repo.AccountSnapshotRepository;
 import com.paystream.ledgerservice.infra.repo.LedgerEntryRepository;
