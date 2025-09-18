@@ -1,17 +1,53 @@
 server:
   port: 8085
+  error:
+    include-message: always
+  tomcat:
+    accesslog:
+      enabled: true
+      directory: /tmp
+      prefix: access_log
+      pattern: '%h %l %u %t "%r" %s %b %D'
 
 spring:
   datasource:
     url: jdbc:postgresql://postgres:5432/paystream
     username: ${POSTGRES_USER:postgres}
     password: ${POSTGRES_PASSWORD:postgres}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+
+
+
   kafka:
     bootstrap-servers: kafka:9092
+
 eureka:
   client:
     serviceUrl:
       defaultZone: ${EUREKA_URL:http://service-registry:8761/eureka}
+
 redis:
   host: redis
   port: 6379
+
+logging:
+  level:
+    root: INFO
+    org.springframework.web: DEBUG
+    com.paystream.transferservice: DEBUG
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,httpexchanges
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+  httpexchanges:
+    recording:
+      enabled: true

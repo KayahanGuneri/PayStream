@@ -5,14 +5,15 @@ spring:
   application:
     name: transfer-service
   datasource:
-    url: jdbc:postgresql://ps-postgres:5432/paystream  # same Docker network: paystream
+    url: jdbc:postgresql://postgres:5432/paystream   # <== DÜZELTİLDİ (postgres)
     username: ${POSTGRES_USER:postgres}
     password: ${POSTGRES_PASSWORD:postgres}
   flyway:
     enabled: true
-  jackson:
-    serialization:
-      write-dates-as-timestamps: false
+    table: flyway_history_transfer
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
 
 eureka:
   client:
@@ -23,6 +24,5 @@ springdoc:
   api-docs.enabled: true
   swagger-ui.path: /swagger-ui.html
 
-# Internal Ledger base URL (Docker DNS resolves service name)
 ledger:
-  base-url: http://ledger-service:8080
+  base-url: http://ledger-service:9100
