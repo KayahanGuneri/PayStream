@@ -21,9 +21,9 @@ public class RowMappers {
     );
 
     public static final RowMapper<AccountBalance> ACCOUNT_BALANCE = (rs, rowNum) -> new AccountBalance(
-            getUuid(rs, "account_id"),
-            rs.getBigDecimal("current_balance"),
-            (Long) rs.getObject("as_of_ledger_offset"), //This column maybe be empty
+            UUID.fromString(rs.getString("account_id")),
+            rs.getLong("balance_minor"),
+            rs.getObject("as_of_ledger_offset", Long.class),
             rs.getTimestamp("updated_at").toInstant()
     );
 
