@@ -163,24 +163,17 @@ services:
   account-service:
     container_name: ps-account
     build:
-      context: ../core/account-service
-      dockerfile: Dockerfile
+      context: ../                      # <— KÖK DİZİN
+      dockerfile: core/account-service/Dockerfile
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      # Docker profili yerine env kullanacaksan alttakileri aç:
-      # SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/paystream
-      # SPRING_DATASOURCE_USERNAME: postgres
-      # SPRING_DATASOURCE_PASSWORD: postgres
       EUREKA_URL: http://service-registry:8761/eureka
       SERVER_PORT: 9000
-    ports:
-      - "9000:9000"
+    ports: [ "9000:9000" ]
     depends_on:
-      postgres:
-        condition: service_healthy
-      service-registry:
-        condition: service_started
-    networks: [paystream-net]
+      postgres: { condition: service_healthy }
+      service-registry: { condition: service_started }
+    networks: [ paystream-net ]
 
   ledger-service:
     container_name: ps-ledger
