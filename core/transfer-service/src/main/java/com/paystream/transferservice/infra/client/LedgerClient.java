@@ -2,7 +2,6 @@
 package com.paystream.transferservice.infra.client;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -10,18 +9,16 @@ import org.springframework.web.client.RestClient;
 import java.util.Map;
 import java.util.UUID;
 
-@Component // generic DI bean
+@Component
 public class LedgerClient {
 
     private final RestClient http;
 
-    // base URL is configurable; Docker internal DNS resolves service names on the same network
-    public LedgerClient(RestClient.Builder lbBuilder) {
-        // Eureka service-id (app name of ledger service)
-        this.http = lbBuilder.baseUrl("http://ledger-service").build();
+    public LedgerClient(RestClient.Builder lbBuilder,
+                        @Value("${ledger.base-url}") String ledgerBaseUrl) {
+        this.http = lbBuilder.baseUrl(ledgerBaseUrl).build();
     }
 
-    // Calls an internal endpoint that appends a double-entry pair to the ledger.
     public boolean appendDoubleEntry(UUID ledgerTxId, UUID source, UUID dest, String currency, long amountMinor) {
         var body = Map.of(
                 "txId", ledgerTxId.toString(),
@@ -31,13 +28,13 @@ public class LedgerClient {
                 }
         );
 
-        var resp = http.post()
-                .uri("/internal/ledger/append")
+        http.post()
+                .uri("/v1/ledger/transactions")   // LedgerController: @RequestMapping("/v1/ledger"), POST "/transactions"
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(body)
                 .retrieve()
                 .toBodilessEntity();
 
-        return resp.getStatusCode().is2xxSuccessful() || resp.getStatusCode() == HttpStatus.NO_CONTENT;
+        return true;
     }
 }

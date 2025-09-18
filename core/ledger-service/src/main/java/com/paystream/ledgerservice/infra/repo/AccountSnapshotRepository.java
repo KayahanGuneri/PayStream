@@ -27,14 +27,17 @@ public class AccountSnapshotRepository {
      */
     public void applyDelta(UUID accountId, String currency, long deltaMinor, long ledgerOffset) {
         final String sql = """
-                INSERT INTO account_snapshots(account_id, currency, balance_minor, as_of_ledger_offset)
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT (account_id, currency)
-                DO UPDATE SET
-                    balance_minor       = account_snapshots.balance_minor + EXCLUDED.balance_minor,
-                    as_of_ledger_offset = EXCLUDED.as_of_ledger_offset
-                WHERE account_snapshots.as_of_ledger_offset IS NULL
-                   OR account_snapshots.as_of_ledger_offset < EXCLUDED.as_of_ledger_offset
-                """;
+        INSERT INTO account_snapshots(account_id, currency, balance_minor, as_of_ledger_offset)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT (account_id, currency)
+        DO UPDATE SET
+            balance_minor       = account_snapshots.balance_minor + EXCLUDED.balance_minor,
+            as_of_ledger_offset = EXCLUDED.as_of_ledger_offset
+        WHERE account_snapshots.as_of_ledger_offset IS NULL
+           OR account_snapshots.as_of_ledger_offset < EXCLUDED.as_of_ledger_offset
+        """;
+        jdbc.update(sql, accountId, currency, deltaMinor, ledgerOffset); // <- BUNUN VAR OLMASI ŞART
     }
+
+
 }

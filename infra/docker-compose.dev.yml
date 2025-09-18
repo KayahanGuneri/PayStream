@@ -181,3 +181,43 @@ services:
       service-registry:
         condition: service_started
     networks: [paystream-net]
+
+  ledger-service:
+    container_name: ps-ledger
+    build:
+      context: ../
+      dockerfile: core/ledger-service/Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 9100
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/paystream
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://service-registry:8761/eureka
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_started }
+      service-registry: { condition: service_started }
+    ports: [ "9100:9100" ]
+    networks: [ paystream-net ]
+
+  transfer-service:
+    container_name: ps-transfer
+    build:
+      context: ../
+      dockerfile: core/transfer-service/Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://service-registry:8761/eureka
+      # (opsiyonel) doğrudan datasource’u da env ile sabitlemek istersen:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/paystream
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_started }
+      service-registry: { condition: service_started }
+      ledger-service: { condition: service_started }
+    ports: [ "8085:8085" ]
+    networks: [ paystream-net ]

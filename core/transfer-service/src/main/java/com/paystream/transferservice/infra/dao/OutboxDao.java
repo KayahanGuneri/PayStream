@@ -14,7 +14,8 @@ public class OutboxDao {
     public void append(String aggregateType, String aggregateId, UUID keyAccountId, String payloadJson) {
         jdbc.update("""
             INSERT INTO outbox_events(aggregate_type, aggregate_id, key_account_id, payload, status)
-            VALUES (?,?,?,?, 'NEW')
+            VALUES (?, ?, ?, ?::jsonb, 'NEW')
         """, aggregateType, aggregateId, keyAccountId, payloadJson);
     }
 }
+
