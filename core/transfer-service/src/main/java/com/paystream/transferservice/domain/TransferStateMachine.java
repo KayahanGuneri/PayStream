@@ -1,25 +1,26 @@
 package com.paystream.transferservice.domain;
 
-/** Guards legal transitions; keeps business rules in one place (OCP-ready). */
+/** Enforces allowed transitions for the transfer lifecycle. */
 public final class TransferStateMachine {
+    private TransferStateMachine() {}
 
-    /** Returns true if transition is allowed by the business. */
-    public static boolean canTransition(TransferStatus from, TransferStatus to) {
-        // PENDING → IN_PROGRESS
-        if (from == TransferStatus.PENDING && to == TransferStatus.IN_PROGRESS) return true;
-        // IN_PROGRESS → COMPLETED|FAILED|REVERSED
-        if (from == TransferStatus.IN_PROGRESS &&
-                (to == TransferStatus.COMPLETED || to == TransferStatus.FAILED || to == TransferStatus.REVERSED)) return true;
-        // All other transitions are illegal
-        return false;
-    }
-
-    /** Throws an IllegalStateException when transition is not allowed. */
+    /** Throws IllegalStateException if transition is not allowed. */
     public static void enforce(TransferStatus from, TransferStatus to) {
-        if (!canTransition(from, to)) {
-            throw new IllegalStateException("Illegal transition: " + from + " → " + to);
+        switch (from) {
+            case PENDING -> {
+                if (!(to == TransferStatus.IN_PROGRESS)) illegal(from, to);
+            }
+            case IN_PROGRESS -> {
+                if (!(to == TransferStatus.COMPLETED || to == TransferStatus.FAILED)) illegal(from, to);
+            }
+            case COMPLETED, FAILED, REVERSED -> {
+                // terminal states: no outbound transitions allowed in Week-5
+                illegal(from, to);
+            }
         }
     }
 
-    private TransferStateMachine() { /* utility class */ }
+    private static void illegal(TransferStatus from, TransferStatus to) {
+        throw new IllegalStateException("Illegal transfer state transition: " + from + " -> " + to);
+    }
 }
