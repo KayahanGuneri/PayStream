@@ -16,27 +16,30 @@ public class TransferDao {
     private final JdbcTemplate jdbc;
     private static final TransferRowMapper MAPPER = new TransferRowMapper();
 
-    public TransferDao(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    public TransferDao(JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
+    }
 
     public Optional<Transfer> findById(UUID id) {
-        var list = jdbc.query("SELECT * FROM transfers WHERE id = ?", MAPPER, id);
+        var list = jdbc.query("SELECT * FROM public.transfers WHERE id = ?", MAPPER, id);
         return list.stream().findFirst();
     }
 
     public Optional<Transfer> findByIdempotencyKey(String key) {
-        var list = jdbc.query("SELECT * FROM transfers WHERE idempotency_key = ?", MAPPER, key);
+        var list = jdbc.query("SELECT * FROM public.transfers WHERE idempotency_key = ?", MAPPER, key);
         return list.stream().findFirst();
     }
 
     public void insertPending(Transfer t) {
         jdbc.update("""
-            INSERT INTO transfers(id, source_account_id, dest_account_id, currency, amount_minor, idempotency_key, status)
+            INSERT INTO public.transfers
+              (id, source_account_id, dest_account_id, currency, amount_minor, idempotency_key, status)
             VALUES (?,?,?,?,?,?,?)
         """, t.id, t.sourceAccountId, t.destAccountId, t.currency, t.amountMinor, t.idempotencyKey, t.status.name());
     }
 
     public void updateStatus(UUID id, TransferStatus status) {
-        jdbc.update("UPDATE transfers SET status=?, updated_at=now() WHERE id=?", status.name(), id);
+        jdbc.update("UPDATE public.transfers SET status=?, updated_at=now() WHERE id=?", status.name(), id);
     }
 
     public void markFailed(UUID id) {
@@ -44,7 +47,10 @@ public class TransferDao {
     }
 
     public void markCompleted(UUID id, UUID ledgerTxId) {
-        jdbc.update("UPDATE transfers SET status=?, ledger_tx_id=?, updated_at=now() WHERE id=?",
-                TransferStatus.COMPLETED.name(), ledgerTxId, id);
+        jdbc.update("""
+            UPDATE public.transfers
+            SET status=?, ledger_tx_id=?, updated_at=now()
+            WHERE id=?
+        """, TransferStatus.COMPLETED.name(), ledgerTxId, id);
     }
 }

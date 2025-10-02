@@ -1,4 +1,4 @@
-package com.paystream.apigateway.config;
+package com.paystream.apigateway.Config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,8 +14,15 @@ public class SecurityConfig {
         return http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .authorizeExchange(ex -> ex
-                        .pathMatchers("/swagger-ui/**","/v3/api-docs/**","/accounts/**","/actuator/**").permitAll()
-                        .anyExchange().permitAll())
+                        .pathMatchers(
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/v3/api-docs/**",
+                                "/accounts/**",
+                                "/actuator/**"
+                        ).permitAll()
+                        .anyExchange().permitAll()
+                )
                 .build();
     }
 }
