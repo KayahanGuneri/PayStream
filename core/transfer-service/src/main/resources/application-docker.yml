@@ -9,17 +9,17 @@ server:
       prefix: access_log
       pattern: '%h %l %u %t "%r" %s %b %D'
 
+# core/transfer-service/src/main/resources/application-docker.yml
 spring:
   datasource:
-    url: jdbc:postgresql://postgres:5432/paystream
-    username: ${POSTGRES_USER:postgres}
-    password: ${POSTGRES_PASSWORD:postgres}
+    url: jdbc:postgresql://postgres:5432/paystream?currentSchema=public
   flyway:
-    enabled: true
+    schemas: public
+    default-schema: public
+    table: flyway_history_transfer
     locations: classpath:db/migration
-
-
-
+    baseline-on-migrate: true
+    baseline-version: 0
 
   kafka:
     bootstrap-servers: kafka:9092

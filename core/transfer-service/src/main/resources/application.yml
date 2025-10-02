@@ -2,14 +2,14 @@ server:
   port: 8085
 
 spring:
-  application:
-    name: transfer-service
   datasource:
-    url: jdbc:postgresql://postgres:5432/paystream   # <== DÜZELTİLDİ (postgres)
+    url: jdbc:postgresql://postgres:5432/paystream?currentSchema=public
     username: ${POSTGRES_USER:postgres}
     password: ${POSTGRES_PASSWORD:postgres}
   flyway:
     enabled: true
+    schemas: public
+    default-schema: public
     table: flyway_history_transfer
     locations: classpath:db/migration
     baseline-on-migrate: true
@@ -25,4 +25,4 @@ springdoc:
   swagger-ui.path: /swagger-ui.html
 
 ledger:
-  base-url: http://ledger-service:9100
+  base-url:  http://ledger-service

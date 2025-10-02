@@ -169,11 +169,19 @@ services:
       SPRING_PROFILES_ACTIVE: docker
       EUREKA_URL: http://service-registry:8761/eureka
       SERVER_PORT: 9000
+      LOGGING_LEVEL_ROOT: DEBUG
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK: DEBUG
+      SERVER_ERROR_INCLUDE_MESSAGE: ALWAYS
+      SERVER_ERROR_INCLUDE_STACKTRACE: ALWAYS
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: loggers,health,info
+
+
     ports: [ "9000:9000" ]
     depends_on:
       postgres: { condition: service_healthy }
       service-registry: { condition: service_started }
     networks: [ paystream-net ]
+
 
   ledger-service:
     container_name: ps-ledger

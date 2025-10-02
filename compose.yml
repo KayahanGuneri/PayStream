@@ -175,25 +175,8 @@ services:
     networks: [ paystream ]
     profiles: [ "services" ]
 
-
-    ports: [ "9100:9100" ]
-    networks: [ paystream ]
-    profiles: [ "services" ]
-
-
-    ports: ["9100:9100"]
-    networks: [paystream]
-    profiles: ["services"]
-
-
-
   transfer-service:
     build:
-
-      context: .
-
-
-      context: .
 
       context: .                                # repo kökü
 
@@ -207,14 +190,6 @@ services:
       ledger-service: { condition: service_started }
     environment:
 
-      SPRING_PROFILES_ACTIVE: docker
-      EUREKA_URL: http://service-registry:8761/eureka
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-
-
-      SPRING_PROFILES_ACTIVE: docker
-      EUREKA_URL: http://service-registry:8761/eureka
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
 

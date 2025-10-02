@@ -17,6 +17,18 @@ spring:
         - id: account
           uri: lb://account-service
           predicates:
-            - Path=/accounts/**    # <--- BURASI
+            - Path=/accounts/**
           # filters:
-          #   - StripPrefix=0      # (gerek yok)
+          #   - StripPrefix=0
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    urls:
+      - name: account-service
+        url: /account/v3/api-docs
+      - name: ledger-service
+        url: /ledger/v3/api-docs
+      - name: transfer-service
+        url: /transfer/v3/api-docs
