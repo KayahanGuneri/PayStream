@@ -20,9 +20,19 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
     baseline-version: 0
+  cloud:
+    loadbalancer:
+      enabled: false          # we do NOT use discovery here
+
 
   kafka:
     bootstrap-servers: kafka:9092
+  application:
+    name: transfer-service
+
+
+ledger:
+  base-url: http://ledger-service:9100
 
 eureka:
   client:

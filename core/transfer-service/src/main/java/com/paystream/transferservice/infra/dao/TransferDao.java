@@ -16,11 +16,21 @@ public class TransferDao {
     private final JdbcTemplate jdbc;
     private static final TransferRowMapper MAPPER = new TransferRowMapper();
 
+
+
     public TransferDao(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
     }
 
     public Optional<Transfer> findById(UUID id) {
+        var sql = """
+          SELECT id, source_account_id, dest_account_id, currency, amount_minor,
+                 status, idempotency_key, created_at, updated_at, ledger_tx_id
+          FROM public.transfers
+          WHERE id = ?
+        """;
+        return jdbc.query(sql, MAPPER, id).stream().findFirst();
+
         var list = jdbc.query("SELECT * FROM public.transfers WHERE id = ?", MAPPER, id);
         return list.stream().findFirst();
     }

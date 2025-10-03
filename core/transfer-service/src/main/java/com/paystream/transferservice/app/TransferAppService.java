@@ -7,6 +7,7 @@ import com.paystream.transferservice.infra.dao.OutboxDao;
 import com.paystream.transferservice.infra.dao.TransferDao;
 import com.paystream.transferservice.infra.mapper.OutboxPayloads;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +27,27 @@ import static com.paystream.transferservice.domain.TransferStatus.*;
 @Service
 @RequiredArgsConstructor
 public class TransferAppService {
+
+    private final TransferDao transferDao;
+    private final LedgerClient ledgerClient;
+    private final OutboxDao outboxDao;
+    private final TransferStepRepository stepRepo;
+
+    @Transactional
+    public Transfer createTransfer(String idemKey, CreateTransferRequest req) {
+        // (1) Basic input rules (simple checks before DB)
+        validateBusiness(req);
+
+        // (2) Quick check: is this key already used?
+        Optional<Transfer> found = transferDao.findByIdempotencyKey(idemKey);
+        if (found.isPresent()) {
+            if (!sameBody(found.get(), req)) {
+                throw new IdempotencyConflictException("Same key, different request body");
+            }
+            return found.get();
+        }
+
+        // (3) Build a new transfer with status PENDING
 
     private final TransferDao transferDao;                 // persistence for transfers
     private final LedgerClient ledgerClient;               // synchronous double-entry call
@@ -59,7 +81,23 @@ public class TransferAppService {
                 req.amountMinor(),
                 idemKey
         );
-        transferDao.insertPending(t);
+
+        try {
+            transferDao.insertPending(t);
+        } catch (DataIntegrityViolationException e) {
+            Transfer existing = transferDao.findByIdempotencyKey(idemKey)
+                    .orElseThrow(() -> e);
+            if (!sameBody(existing, req)) {
+                throw new IdempotencyConflictException("Same key, different request body");
+            }
+            return existing;
+        }
+
+        // (4) State change: PENDING → IN_PROGRESS
+        fsmTransition(t, PENDING, IN_PROGRESS, "accepted");
+        transferDao.updateStatus(transferId, IN_PROGRESS);
+
+        // (5) Call ledger
 
         // 3) FSM: PENDING -> IN_PROGRESS (guard + audit) + persist status
         fsmTransition(t, PENDING, IN_PROGRESS, "accepted");
@@ -76,6 +114,8 @@ public class TransferAppService {
                     req.currency(),
                     req.amountMinor()
             );
+        } catch (Exception ex) {
+
         } catch (InsufficientFundsException ife) {
             // Treat as business failure in Week-5 scope
             ok = false;
@@ -85,11 +125,23 @@ public class TransferAppService {
         }
 
         if (!ok) {
+            // (6a) Failure path
+
             // 5a) FSM: IN_PROGRESS -> FAILED (guard + audit) + persist + event
             fsmTransition(t, IN_PROGRESS, FAILED, "ledger_error");
             transferDao.markFailed(transferId);
             outboxDao.append(
                     "TRANSFER_FAILED",
+                    transferId,
+                    null,  // key_account_id bilinçli null olabilir
+                    OutboxPayloads.transferFailed(transferId.toString(), "LEDGER_ERROR")
+            );
+            t.status = FAILED;
+            return t;
+        }
+
+        // (6b) Success path
+
                     transferId.toString(),
                     null,
                     OutboxPayloads.transferFailed(transferId.toString(), "LEDGER_ERROR")
@@ -103,6 +155,8 @@ public class TransferAppService {
         transferDao.markCompleted(transferId, ledgerTxId);
         outboxDao.append(
                 "TRANSFER_COMPLETED",
+                transferId,
+                req.destAccountId(), // artık UUID olarak geçiyoruz
                 transferId.toString(),
                 req.destAccountId(),
                 OutboxPayloads.transferCompleted(transferId.toString(), ledgerTxId.toString())
@@ -118,6 +172,12 @@ public class TransferAppService {
                 .orElseThrow(() -> new NotFoundException("Transfer %s not found".formatted(id)));
     }
 
+    // -- Helpers --
+
+    private void validateBusiness(CreateTransferRequest req) {
+        if (Objects.equals(req.sourceAccountId(), req.destAccountId())) {
+            throw new DomainValidationException("sourceAccountId must differ from destAccountId");
+
     // -------- helpers --------
 
     /** Extra business rules that complement Bean Validation on DTOs. */
@@ -129,6 +189,12 @@ public class TransferAppService {
         if (req.amountMinor() <= 0) {
             throw new DomainValidationException("amountMinor must be > 0");
         }
+        if (req.currency() == null || req.currency().length() != 3) {
+            throw new DomainValidationException("currency must be 3 letters (e.g. USD)");
+        }
+    }
+
+
         if (req.currency() == null || req.currency().length() != 3
                 || !req.currency().equals(req.currency().toUpperCase())) {
             throw new DomainValidationException("currency must be 3-letter ISO uppercase (e.g., TRY, USD)");
@@ -142,6 +208,9 @@ public class TransferAppService {
                 && existing.currency().equalsIgnoreCase(req.currency())
                 && existing.amountMinor() == req.amountMinor();
     }
+
+    private void fsmTransition(Transfer t, TransferStatus from, TransferStatus to, String reason) {
+        TransferStateMachine.enforce(from, to);
 
     /** Guards FSM and writes an audit step. DB status update is performed by DAO at call sites. */
     private void fsmTransition(Transfer t, TransferStatus from, TransferStatus to, String reason) {

@@ -10,6 +10,20 @@ import org.springframework.web.client.RestClient;
 import java.time.Duration;
 
 /**
+ * Plain HTTP client config (no service discovery).
+ * - Exposes a single RestClient.Builder bean
+ * - Sets small connect/read timeouts
+ */
+@Configuration
+public class HttpClientConfig {
+
+    @Bean
+    public RestClient.Builder restClientBuilder() {
+        // Set basic timeouts
+        ClientHttpRequestFactorySettings settings = ClientHttpRequestFactorySettings.DEFAULTS
+                .withConnectTimeout(Duration.ofSeconds(3))
+                .withReadTimeout(Duration.ofSeconds(5));
+
  * Central HTTP client configuration.
  * - Exposes a single LoadBalanced RestClient.Builder bean (Eureka-aware)
  * - Sets conservative connect/read timeouts
@@ -31,3 +45,8 @@ public class HttpClientConfig {
     }
 }
 
+        // Return a plain builder (no @LoadBalanced)
+        return RestClient.builder()
+                .requestFactory(ClientHttpRequestFactories.get(settings));
+    }
+}
