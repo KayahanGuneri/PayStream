@@ -9,7 +9,6 @@ server:
       prefix: access_log
       pattern: '%h %l %u %t "%r" %s %b %D'
 
-# core/transfer-service/src/main/resources/application-docker.yml
 spring:
   datasource:
     url: jdbc:postgresql://postgres:5432/paystream?currentSchema=public
@@ -20,9 +19,17 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
     baseline-version: 0
-
+  cloud:
+    loadbalancer:
+      enabled: false          # we do NOT use discovery here
   kafka:
     bootstrap-servers: kafka:9092
+  application:
+    name: transfer-service
+
+
+ledger:
+  base-url: http://ledger-service:9100
 
 eureka:
   client:

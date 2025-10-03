@@ -20,7 +20,7 @@ dependencies {
   implementation 'org.springframework.boot:spring-boot-starter-validation'
   implementation 'org.springframework.boot:spring-boot-starter-jdbc'
   runtimeOnly 'org.postgresql:postgresql:42.7.3'
-
+  implementation 'org.springframework.boot:spring-boot-starter-actuator'
   // ➜ PostgreSQL driver (GEREKLİ)
   runtimeOnly 'org.postgresql:postgresql:42.7.3'
 
