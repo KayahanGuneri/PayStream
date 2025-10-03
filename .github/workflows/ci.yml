@@ -10,33 +10,28 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    services:
-      docker:
-        image: docker:20.10-dind
-        privileged: true
-        ports:
-          - 2375:2375
-        options: >-
-          --dns 8.8.8.8
-          --dns 8.8.4.4
-
     env:
-      DOCKER_HOST: tcp://localhost:2375
       TESTCONTAINERS_RYUK_DISABLED: true
       TESTCONTAINERS_CHECKS_DISABLE: true
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: 21
+          distribution: temurin
+          java-version: '21'
 
-      - name: Grant execute permission for Gradle
+      - name: Cache Gradle
+        uses: gradle/gradle-build-action@v3
+
+      - name: Make Gradle wrapper executable
         run: chmod +x gradlew
 
-      - name: Build & Run Tests
+      - name: Build & Test
         run: ./gradlew clean build --no-daemon --stacktrace
+
+      - name: Build Docker image
+        run: docker build -t paystream/transfer-service:ci -f core/transfer-service/Dockerfile .
