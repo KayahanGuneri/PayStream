@@ -9,6 +9,7 @@ server:
       prefix: access_log
       pattern: '%h %l %u %t "%r" %s %b %D'
 
+# core/transfer-service/src/main/resources/application-docker.yml
 spring:
   datasource:
     url: jdbc:postgresql://postgres:5432/paystream?currentSchema=public
@@ -22,6 +23,8 @@ spring:
   cloud:
     loadbalancer:
       enabled: false          # we do NOT use discovery here
+
+
   kafka:
     bootstrap-servers: kafka:9092
   application:

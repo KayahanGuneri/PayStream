@@ -17,6 +17,7 @@ public class TransferDao {
     private static final TransferRowMapper MAPPER = new TransferRowMapper();
 
 
+
     public TransferDao(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
     }
@@ -29,6 +30,9 @@ public class TransferDao {
           WHERE id = ?
         """;
         return jdbc.query(sql, MAPPER, id).stream().findFirst();
+
+        var list = jdbc.query("SELECT * FROM public.transfers WHERE id = ?", MAPPER, id);
+        return list.stream().findFirst();
     }
 
     public Optional<Transfer> findByIdempotencyKey(String key) {
