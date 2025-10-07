@@ -1,11 +1,13 @@
 server:
   port: 9100
-
 spring:
   application:
     name: ledger-service
   flyway:
     enabled: true
+    table: flyway_history_ledger
+    baseline-on-migrate: true
+    baseline-version: 1
 
 logging:
   level:

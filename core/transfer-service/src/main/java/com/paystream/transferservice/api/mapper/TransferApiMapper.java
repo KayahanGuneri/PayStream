@@ -4,13 +4,16 @@ package com.paystream.transferservice.api.mapper;
 
 import com.paystream.transferservice.api.TransferResponse;
 import com.paystream.transferservice.domain.Transfer;
+import org.springframework.stereotype.Component;
 
+
+@Component
 public final class TransferApiMapper {
 
     private TransferApiMapper() {}
 
     // Domain -> API Response
     public static TransferResponse toResponse(Transfer t) {
-        return new TransferResponse(t.id, t.status, t.ledgerTxId);
+        return new TransferResponse(t.id(), t.status(), t.ledgerTxId());
     }
 }

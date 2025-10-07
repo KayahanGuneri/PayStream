@@ -170,14 +170,16 @@ services:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
 
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://service-registry:8761/eureka
+
     ports: [ "9100:9100" ]
     networks: [ paystream ]
     profiles: [ "services" ]
 
-
   transfer-service:
     build:
-      context: .
+
+      context: .                                # repo kökü
+
       dockerfile: core/transfer-service/Dockerfile
     image: paystream/transfer-service:dev
     container_name: transfer-service
@@ -185,11 +187,16 @@ services:
       postgres: { condition: service_healthy }
       kafka: { condition: service_started }
       service-registry: { condition: service_started }
+      ledger-service: { condition: service_started }
     environment:
-      SPRING_PROFILES_ACTIVE: docker
-      EUREKA_URL: http://service-registry:8761/eureka
+
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+
+      SPRING_PROFILES_ACTIVE: docker            # application-docker.yml okunur
+      EUREKA_URL: http://service-registry:8761/eureka
+
+
     ports: [ "8085:8085" ]
     networks: [ paystream ]
     profiles: [ "services" ]

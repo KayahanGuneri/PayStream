@@ -1,12 +1,11 @@
 package com.paystream.accountservice.domain.account;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
+
 public record AccountBalance(
         UUID accountId,
-        BigDecimal currentBalance,
+        long balanceMinor,     // <- BIGINT minor units
         Long asOfLedgerOffset,
         Instant updatedAt
-){}
-
+) {}
