@@ -1,4 +1,5 @@
 // Centralized exception-to-HTTP mapping using RFC7807 Problem+JSON.
+
 package com.paystream.transferservice.api;
 
 import com.paystream.transferservice.domain.DomainValidationException;
@@ -25,6 +26,9 @@ import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 
+@RestControllerAdvice
+
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
@@ -34,10 +38,17 @@ import java.util.UUID;
 
 @Slf4j
 @RestControllerAdvice(basePackages = "com.paystream.transferservice")
+
 public class GlobalExceptionHandler {
 
     // ---- Body validation
     @ExceptionHandler(MethodArgumentNotValidException.class)
+
+    public ResponseEntity<ErrorResponse> handleBodyValidation(MethodArgumentNotValidException ex) {
+        var msg = ex.getBindingResult()
+                .getFieldErrors()
+                .stream()
+
     public ResponseEntity<ProblemDetail> onBodyValidation(MethodArgumentNotValidException ex, HttpServletRequest req) {
         String msg = firstFieldError(ex).map(fe -> fe.getField() + " " + fe.getDefaultMessage())
 
@@ -59,12 +70,24 @@ public class GlobalExceptionHandler {
         String msg = ex.getFieldErrors().stream().findFirst()
 
         String msg = ex.getFieldErrors().stream()
+
                 .findFirst()
                 .map(fe -> fe.getField() + " " + fe.getDefaultMessage())
                 .orElse("Validation error");
         ProblemDetail pd = problem(HttpStatus.BAD_REQUEST, "Validation Error", msg, req,
                 "https://docs.paystream.dev/problems/validation");
         return ResponseEntity.status(pd.getStatus()).body(pd);
+    }
+
+    @ExceptionHandler(BindException.class)
+    public ResponseEntity<ErrorResponse> handleBind(BindException ex) {
+        var msg = ex.getBindingResult()
+                .getFieldErrors()
+                .stream()
+                .findFirst()
+                .map(err -> err.getField() + " " + err.getDefaultMessage())
+                .orElse("Binding error");
+        return ResponseEntity.badRequest().body(new ErrorResponse("BIND_ERROR", msg));
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
@@ -83,6 +106,17 @@ public class GlobalExceptionHandler {
                 "https://docs.paystream.dev/problems/validation");
         return ResponseEntity.status(pd.getStatus()).body(pd);
     }
+
+
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<ErrorResponse> handleMissingHeader(MissingRequestHeaderException ex) {
+        String msg = "Missing header: " + ex.getHeaderName();
+        return ResponseEntity.badRequest().body(new ErrorResponse("MISSING_HEADER", msg));
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalArg(IllegalArgumentException ex) {
+        return ResponseEntity.badRequest().body(new ErrorResponse("BAD_REQUEST", ex.getMessage()));
 
     // ---- Header / path / JSON parse
 
@@ -143,6 +177,7 @@ public class GlobalExceptionHandler {
         ProblemDetail pd = problem(HttpStatus.CONFLICT, "Idempotency Conflict", ex.getMessage(), req,
                 "https://docs.paystream.dev/problems/idempotency-conflict");
         return ResponseEntity.status(pd.getStatus()).body(pd);
+
     }
 
     @ExceptionHandler(NotFoundException.class)

@@ -45,6 +45,14 @@ public class TransferAppService {
             return found.get();
         }
 
+
+        // 2) Basic guard: source and destination cannot be the same
+        if (req.sourceAccountId().equals(req.destAccountId())) {
+            var fail = new Transfer();
+            fail.id = UUID.randomUUID();
+            fail.status = TransferStatus.FAILED;
+            return fail;
+
         // (3) Build a new transfer with status PENDING
 
     private final TransferDao transferDao;                 // persistence for transfers
@@ -65,6 +73,7 @@ public class TransferAppService {
                 throw new IdempotencyConflictException("Same key, different request body");
             }
             return found.get();
+
         }
 
         // 2) create aggregate in PENDING
@@ -113,6 +122,50 @@ public class TransferAppService {
 
         // 4) call ledger
         UUID ledgerTxId = UUID.randomUUID();
+
+        boolean ok = ledgerClient.appendDoubleEntry(
+                ledgerTxId,
+                req.sourceAccountId(),
+                req.destAccountId(),
+                req.currency(),
+                req.amountMinor()
+        );
+
+        if (!ok) {
+            // 6a) Mark FAILED + emit outbox event
+            transferDao.markFailed(transferId);
+
+            // NOTE: OutboxDao expects UUIDs now (no toString for ids)
+            outboxDao.append(
+                    "TRANSFER_FAILED",
+                    transferId,                   // aggregateId (UUID)
+                    null,                         // keyAccountId can be null if schema allows
+                    OutboxPayloads.transferFailed(
+                            transferId.toString(), // JSON keeps string form
+                            "LEDGER_ERROR"
+                    )
+            );
+
+            t.status = TransferStatus.FAILED;
+            return t;
+        }
+
+        // 6b) Mark COMPLETED + emit outbox event
+        transferDao.markCompleted(transferId, ledgerTxId);
+
+        outboxDao.append(
+                "TRANSFER_COMPLETED",
+                transferId,                    // aggregateId (UUID)
+                req.destAccountId(),           // keyAccountId (UUID)
+                OutboxPayloads.transferCompleted(
+                        transferId.toString(),  // JSON payload as string
+                        ledgerTxId.toString()
+                )
+        );
+
+        // reflect changes in the returned domain object
+        t.status = TransferStatus.COMPLETED;
+
         boolean ok;
         try {
             ok = ledgerClient.appendDoubleEntry(
@@ -174,6 +227,7 @@ public class TransferAppService {
                 OutboxPayloads.transferCompleted(transferId.toString(), ledgerTxId.toString())
         );
         t.status = COMPLETED;
+
         t.ledgerTxId = ledgerTxId;
         return t;
     }
