@@ -35,7 +35,7 @@ public class TransferAppService {
             return existing.get();
         }
 
-        // 2) Simple business guards (extra to @Valid)
+        // 2) Basic guard: source and destination cannot be the same
         if (req.sourceAccountId().equals(req.destAccountId())) {
             var fail = new Transfer();
             fail.id = UUID.randomUUID();
@@ -60,25 +60,47 @@ public class TransferAppService {
 
         // 5) Call Ledger (synchronous in Week 5)
         UUID ledgerTxId = UUID.randomUUID();
-        boolean ok = ledgerClient.appendDoubleEntry(ledgerTxId,
-                req.sourceAccountId(), req.destAccountId(),
-                req.currency(), req.amountMinor());
+        boolean ok = ledgerClient.appendDoubleEntry(
+                ledgerTxId,
+                req.sourceAccountId(),
+                req.destAccountId(),
+                req.currency(),
+                req.amountMinor()
+        );
 
         if (!ok) {
-            // 6a) Mark FAILED + emit event
+            // 6a) Mark FAILED + emit outbox event
             transferDao.markFailed(transferId);
-            outboxDao.append("TRANSFER_FAILED", transferId.toString(), null,
-                    OutboxPayloads.transferFailed(transferId.toString(), "LEDGER_ERROR"));
+
+            // NOTE: OutboxDao expects UUIDs now (no toString for ids)
+            outboxDao.append(
+                    "TRANSFER_FAILED",
+                    transferId,                   // aggregateId (UUID)
+                    null,                         // keyAccountId can be null if schema allows
+                    OutboxPayloads.transferFailed(
+                            transferId.toString(), // JSON keeps string form
+                            "LEDGER_ERROR"
+                    )
+            );
+
             t.status = TransferStatus.FAILED;
             return t;
         }
 
-        // 6b) Mark COMPLETED + emit event
+        // 6b) Mark COMPLETED + emit outbox event
         transferDao.markCompleted(transferId, ledgerTxId);
-        outboxDao.append("TRANSFER_COMPLETED", transferId.toString(), req.destAccountId(),
-                OutboxPayloads.transferCompleted(transferId.toString(), ledgerTxId.toString()));
 
-        // reflect changes in the returned domain object (kept simple)
+        outboxDao.append(
+                "TRANSFER_COMPLETED",
+                transferId,                    // aggregateId (UUID)
+                req.destAccountId(),           // keyAccountId (UUID)
+                OutboxPayloads.transferCompleted(
+                        transferId.toString(),  // JSON payload as string
+                        ledgerTxId.toString()
+                )
+        );
+
+        // reflect changes in the returned domain object
         t.status = TransferStatus.COMPLETED;
         t.ledgerTxId = ledgerTxId;
         return t;
