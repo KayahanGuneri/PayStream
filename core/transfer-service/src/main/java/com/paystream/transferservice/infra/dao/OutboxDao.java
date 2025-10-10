@@ -15,6 +15,7 @@ public class OutboxDao {
         this.jdbc = jdbc;
     }
 
+
     /**
      * outbox_events tablosuna satır ekler.
      * Şema: aggregate_type(text), aggregate_id(uuid), key_account_id(uuid), payload_json(jsonb), status(text)
@@ -42,5 +43,15 @@ public class OutboxDao {
             ps.setString(4, payloadJson);                   // ::jsonb ile cast edeceğiz
             return ps;
         });
+
+
+    public void append(String aggregateType, UUID aggregateId, UUID keyAccountId, String payloadJson) {
+        jdbc.update("""
+            INSERT INTO account.outbox_events
+                (aggregate_type, aggregate_id, key_account_id, payload, status)
+            VALUES (?, ?, ?, ?::jsonb, 'NEW')
+        """, aggregateType, aggregateId, keyAccountId, payloadJson);
+
+
     }
 }

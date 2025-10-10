@@ -30,6 +30,7 @@ public class LedgerTransactionAppService {
 
         // --- 2) Append records (append-only) and sum the given offsets ---
         int seq = 0;
+        // ...
         for (BookTransactionRequest.Entry line : req.getEntries()) {
             LedgerEntry e = LedgerEntry.builder()
                     .entryId(UUID.randomUUID())
@@ -40,18 +41,23 @@ public class LedgerTransactionAppService {
                     .amountMinor(line.getAmountMinor())
                     .build();
 
-            long offset = entryRepo.insert(e); // DB sequence’den global offset
+            var result = entryRepo.upsert(e); // <-- insert yerine upsert kullan
 
-            // --- 3) Create outbox row for each ENTRY (key = accountId) ---
+            if (!result.inserted()) {
+                // zaten vardı → outbox YAZMA (idempotency)
+                continue;
+            }
+
+            // --- outbox sadece yeni kayıt için ---
             Map<String, Object> payload = new LinkedHashMap<>();
             payload.put("eventId", UUID.randomUUID().toString());
             payload.put("txId", e.getTxId().toString());
             payload.put("entryId", e.getEntryId().toString());
-            payload.put("ledgerOffset", offset);
+            payload.put("ledgerOffset", e.getLedgerOffset());
             payload.put("accountId", e.getAccountId().toString());
             payload.put("currency", e.getCurrency());
             payload.put("amountMinor", e.getAmountMinor());
-            payload.put("occurredAt", e.getCreatedAt() == null ? new Date() : Date.from(e.getCreatedAt().toInstant()));
+            payload.put("occurredAt", Date.from(e.getCreatedAt().toInstant()));
 
             try {
                 outboxRepo.insert(OutboxRecord.builder()
@@ -64,6 +70,7 @@ public class LedgerTransactionAppService {
                 throw new IllegalStateException("Failed to serialize event payload", ex);
             }
         }
+
 
     }
 
