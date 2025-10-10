@@ -44,12 +44,14 @@ public class OutboxDao {
             return ps;
         });
 
+
     public void append(String aggregateType, UUID aggregateId, UUID keyAccountId, String payloadJson) {
         jdbc.update("""
             INSERT INTO account.outbox_events
                 (aggregate_type, aggregate_id, key_account_id, payload, status)
             VALUES (?, ?, ?, ?::jsonb, 'NEW')
         """, aggregateType, aggregateId, keyAccountId, payloadJson);
+
 
     }
 }
