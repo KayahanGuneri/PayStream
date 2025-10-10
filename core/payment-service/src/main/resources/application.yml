@@ -7,3 +7,10 @@ management:
     web:
       exposure:
         include: health,info,prometheus
+
+
+payment:
+  risk:
+    threeDs-enabled: true
+    amount-threshold: 1000.00
+

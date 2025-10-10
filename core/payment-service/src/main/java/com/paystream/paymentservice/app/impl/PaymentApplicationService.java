@@ -5,6 +5,7 @@ import com.paystream.paymentservice.app.command.*;
 import com.paystream.paymentservice.app.port.*;
 import com.paystream.paymentservice.app.provider.PaymentProviderPort;
 import com.paystream.paymentservice.common.exception.*;
+import com.paystream.paymentservice.infra.config.PaymentRiskProperties;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,9 +16,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-@Service // Registers this class as an application service
+@Service // Application service (use-case orchestrator)
 public class PaymentApplicationService implements PaymentUseCase {
 
+    // Ports (DIP): application depends on abstractions, not implementations
     private final PaymentRepository paymentRepo;
     private final PaymentIntentRepository intentRepo;
     private final PaymentCaptureRepository captureRepo;
@@ -26,14 +28,18 @@ public class PaymentApplicationService implements PaymentUseCase {
     private final OutboxPort outbox;
     private final PaymentProviderPort provider;
 
+    // Config-driven risk decision (toggle + threshold)
+    private final PaymentRiskProperties riskProps;
+
     public PaymentApplicationService(PaymentRepository paymentRepo,
                                      PaymentIntentRepository intentRepo,
                                      PaymentCaptureRepository captureRepo,
                                      VaultTokenPort vault,
                                      ThreeDSSessionPort threeDS,
                                      OutboxPort outbox,
-                                     PaymentProviderPort provider) {
-        // DIP: constructor injection of ports keeps this class infrastructure-agnostic
+                                     PaymentProviderPort provider,
+                                     PaymentRiskProperties riskProps) {
+        // Constructor injection → easier testing and enforces immutability
         this.paymentRepo = paymentRepo;
         this.intentRepo = intentRepo;
         this.captureRepo = captureRepo;
@@ -41,51 +47,60 @@ public class PaymentApplicationService implements PaymentUseCase {
         this.threeDS = threeDS;
         this.outbox = outbox;
         this.provider = provider;
+        this.riskProps = riskProps;
     }
 
     @Override
-    @Transactional // Atomic DB changes; prefer external I/O out of the TX for real impl
+    @Transactional // Atomic DB changes (keep external I/O short)
     public UUID authorize(AuthorizeCommand cmd) {
-        // Idempotent lookup by (merchantId, idempotencyKey)
+        // 1) Idempotency guard: (merchantId, idempotencyKey)
         Optional<PaymentRepository.PaymentRecord> existing =
                 paymentRepo.findByIdemKey(cmd.merchantId(), cmd.idempotencyKey());
         if (existing.isPresent()) {
             return UUID.fromString(existing.get().id());
         }
 
-        // Token validation via vault (no PAN storage)
+        // 2) Basic validation (vault token; amount format)
         if (!vault.isValidToken(cmd.cardToken())) {
             throw new InvalidTokenException("Invalid card token");
         }
+        BigDecimal normalizedAmount = normalize(cmd.amount());
 
+        // 3) Persist payment in AUTH_PENDING
         Instant now = Instant.now();
         UUID paymentId = paymentRepo.create(
-                cmd.merchantId(), normalize(cmd.amount()), cmd.currency(),
+                cmd.merchantId(), normalizedAmount, cmd.currency(),
                 cmd.cardToken(), cmd.idempotencyKey(), "AUTH_PENDING", now);
 
-        // Minimal RBA: assume low risk (no 3DS) for skeleton
-        boolean requires3ds = false;
-        intentRepo.create(paymentId.toString(), cmd.amount(), requires3ds, "LOW_RISK", now);
+        // 4) Risk decision (config-driven) → may require 3DS
+        boolean requires3ds = shouldRequire3ds(normalizedAmount);
+        intentRepo.create(paymentId.toString(), normalizedAmount,
+                requires3ds, requires3ds ? "HIGH_AMOUNT" : "LOW_RISK", now);
 
         if (requires3ds) {
+            // Create 3DS challenge session (in-memory/Redis adapter decides how)
             String challengeId = UUID.randomUUID().toString();
-            String code = "123456";
+            String code = "123456"; // mock challenge code for dev
             threeDS.createSession(paymentId.toString(), challengeId, code, Duration.ofSeconds(120), 3);
+
             paymentRepo.updateStatus(paymentId.toString(), "THREE_DS_REQUIRED", now);
+            // Business signal: client must complete challenge
             throw new ThreeDSChallengeRequiredException("3DS required");
         }
 
-        // Provider authorize (sync stub)
-        String providerRef = provider.authorize(cmd.merchantId(), cmd.amount(), cmd.currency(), cmd.cardToken());
+        // 5) Provider authorize (sync mock); update status → AUTH_APPROVED
+        String providerRef = provider.authorize(cmd.merchantId(), normalizedAmount, cmd.currency(), cmd.cardToken());
         paymentRepo.updateStatus(paymentId.toString(), "AUTH_APPROVED", now);
 
+        // 6) Emit outbox event for downstream (fraud, ledger, notifications, ...)
         outbox.appendEvent("PAYMENT", paymentId.toString(), "payment.authorized.v1",
                 Map.of("paymentId", paymentId.toString(),
                         "merchantId", cmd.merchantId(),
-                        "amount", cmd.amount().toPlainString(),
+                        "amount", normalizedAmount.toPlainString(),
                         "currency", cmd.currency(),
                         "status", "AUTH_APPROVED",
-                        "providerRef", providerRef), now);
+                        "providerRef", providerRef),
+                now);
 
         return paymentId;
     }
@@ -93,29 +108,38 @@ public class PaymentApplicationService implements PaymentUseCase {
     @Override
     @Transactional
     public void confirm3ds(Confirm3DSCommand cmd) {
+        // Verify challenge session; adapter is responsible for TTL/attempts
         boolean ok = threeDS.verifyAndConsume(cmd.paymentId(), cmd.challengeId(), cmd.code());
         if (!ok) throw new PaymentException("3DS verification failed");
+
         Instant now = Instant.now();
         paymentRepo.updateStatus(cmd.paymentId(), "THREE_DS_VERIFIED", now);
+
+        // After a successful 3DS, we treat it as authorized (separate event type in real world)
         outbox.appendEvent("PAYMENT", cmd.paymentId(), "payment.authorized.v1",
                 Map.of("paymentId", cmd.paymentId(),
                         "status", "AUTH_APPROVED",
-                        "authorizedAt", now.toString()), now);
+                        "authorizedAt", now.toString()),
+                now);
     }
 
     @Override
     @Transactional
     public UUID capture(CaptureCommand cmd) {
         Instant now = Instant.now();
-        String providerRef = provider.capture(cmd.paymentId(), normalize(cmd.amount()));
-        UUID captureId = captureRepo.create(cmd.paymentId(), normalize(cmd.amount()),
+        BigDecimal normalized = normalize(cmd.amount());
+
+        // Delegate to provider and persist capture
+        String providerRef = provider.capture(cmd.paymentId(), normalized);
+        UUID captureId = captureRepo.create(cmd.paymentId(), normalized,
                 "SUCCEEDED", providerRef, cmd.idempotencyKey(), now);
 
         outbox.appendEvent("PAYMENT", cmd.paymentId(), "payment.captured.v1",
                 Map.of("paymentId", cmd.paymentId(),
                         "captureId", captureId.toString(),
-                        "amount", cmd.amount().toPlainString(),
-                        "capturedAt", now.toString()), now);
+                        "amount", normalized.toPlainString(),
+                        "capturedAt", now.toString()),
+                now);
         return captureId;
     }
 
@@ -123,21 +147,36 @@ public class PaymentApplicationService implements PaymentUseCase {
     @Transactional
     public UUID refund(RefundCommand cmd) {
         Instant now = Instant.now();
-        String providerRef = provider.refund(cmd.paymentId(), normalize(cmd.amount()));
-        UUID refundId = captureRepo.create(cmd.paymentId(), normalize(cmd.amount()),
+        BigDecimal normalized = normalize(cmd.amount());
+
+        String providerRef = provider.refund(cmd.paymentId(), normalized);
+        UUID refundId = captureRepo.create(cmd.paymentId(), normalized,
                 "REFUNDED", providerRef, cmd.idempotencyKey(), now);
 
         outbox.appendEvent("PAYMENT", cmd.paymentId(), "payment.refunded.v1",
                 Map.of("paymentId", cmd.paymentId(),
                         "refundId", refundId.toString(),
-                        "amount", cmd.amount().toPlainString(),
-                        "refundedAt", now.toString()), now);
+                        "amount", normalized.toPlainString(),
+                        "refundedAt", now.toString()),
+                now);
         return refundId;
     }
 
-    // Normalizes monetary value to scale=2 with HALF_EVEN rule
+    // --- Helpers -------------------------------------------------------------
+
+    // Config-driven 3DS decision: global toggle + threshold
+    private boolean shouldRequire3ds(BigDecimal amount) {
+        if (!riskProps.isThreeDsEnabled()) return false;
+        return amount != null && amount.compareTo(riskProps.getAmountThreshold()) >= 0;
+    }
+
+    // Normalizes monetary value to scale=2 with HALF_EVEN rule and validates > 0
     private BigDecimal normalize(BigDecimal amount) {
         if (amount == null) throw new PaymentValidationException("Amount is required");
-        return amount.setScale(2, java.math.RoundingMode.HALF_EVEN);
+        BigDecimal normalized = amount.setScale(2, java.math.RoundingMode.HALF_EVEN);
+        if (normalized.signum() <= 0) {
+            throw new PaymentValidationException("Amount must be positive");
+        }
+        return normalized;
     }
 }
