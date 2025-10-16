@@ -1,4 +1,3 @@
-# compose.yml
 name: paystream
 
 networks:
@@ -13,14 +12,14 @@ services:
   postgres:
     image: postgres:16
     container_name: ps-postgres
-    ports: ["5433:5432"]   # host 5433 -> container 5432
+    ports: ["5433:5432"]                # host 5433 -> container 5432
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: paystream
     volumes:
       - pg_data:/var/lib/postgresql/data
-      - ./docker/initdb:/docker-entrypoint-initdb.d   # e.g., create-ledgerdb.sql
+      - ./docker/initdb:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d paystream"]
       interval: 5s
@@ -50,9 +49,8 @@ services:
     image: confluentinc/cp-kafka:7.6.1
     container_name: kafka
     depends_on:
-      zookeeper:
-        condition: service_started
-    ports: ["29092:29092"]
+      zookeeper: { condition: service_started }
+    ports: ["29092:29092"]              # dışarıdan: localhost:29092
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
@@ -104,8 +102,7 @@ services:
     image: paystream/api-gateway:dev
     container_name: api-gateway
     depends_on:
-      service-registry:
-        condition: service_started
+      service-registry: { condition: service_started }
     ports: ["8080:8080"]
     environment:
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://service-registry:8761/eureka
@@ -126,26 +123,16 @@ services:
       service-registry: { condition: service_started }
     environment:
       SPRING_PROFILES_ACTIVE: docker
-
-      # Web bind (genelde gerekmez ama garanti)
       SERVER_ADDRESS: 0.0.0.0
       SERVER_PORT: 9000
-
-      # DB – container içinden erişim
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/paystream
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-
-      # Kafka
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-
-      # Eureka
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://service-registry:8761/eureka
-      # (alternatif olarak uygulama bunu EUREKA_URL key’inden de okuyorsa onu verin)
-
-    ports: [ "9000:9000" ]
-    networks: [ paystream ]
-    profiles: [ "services" ]
+    ports: ["9000:9000"]
+    networks: [paystream]
+    profiles: ["services"]
 
   ledger-service:
     build:
@@ -159,27 +146,20 @@ services:
       service-registry: { condition: service_started }
     environment:
       SPRING_PROFILES_ACTIVE: docker
-
       SERVER_ADDRESS: 0.0.0.0
       SERVER_PORT: 9100
-
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/paystream
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://service-registry:8761/eureka
-
-    ports: [ "9100:9100" ]
-    networks: [ paystream ]
-    profiles: [ "services" ]
+    ports: ["9100:9100"]
+    networks: [paystream]
+    profiles: ["services"]
 
   transfer-service:
     build:
-
-      context: .                                # repo kökü
-
+      context: .
       dockerfile: core/transfer-service/Dockerfile
     image: paystream/transfer-service:dev
     container_name: transfer-service
@@ -189,16 +169,35 @@ services:
       service-registry: { condition: service_started }
       ledger-service: { condition: service_started }
     environment:
+      SPRING_PROFILES_ACTIVE: docker
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://service-registry:8761/eureka
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/paystream
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    ports: ["8085:8085"]
+    networks: [paystream]
+    profiles: ["services"]
 
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-
-      SPRING_PROFILES_ACTIVE: docker            # application-docker.yml okunur
-      EUREKA_URL: http://service-registry:8761/eureka
-
-
-    ports: [ "8085:8085" ]
-    networks: [ paystream ]
-    profiles: [ "services" ]
-
-
+  payment-service:
+    build:
+      context: .
+      dockerfile: core/payment-service/Dockerfile   # Modül kökün başka ise buna göre değiştir
+    image: paystream/payment-service:dev
+    container_name: payment-service
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_started }
+      service-registry: { condition: service_started }
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_ADDRESS: 0.0.0.0
+      SERVER_PORT: 9095
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/paystream
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://service-registry:8761/eureka
+    ports: ["9095:9095"]
+    networks: [paystream]
+    profiles: ["services"]
