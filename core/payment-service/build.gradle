@@ -1,5 +1,5 @@
 plugins {
-  id 'org.springframework.boot'            // versiyonu root'taki pluginManagement belirler
+  id 'org.springframework.boot'
   id 'io.spring.dependency-management'
   id 'java'
   id 'jacoco'
@@ -9,7 +9,9 @@ group = 'com.paystream'
 version = '0.0.1-SNAPSHOT'
 
 java {
-  toolchain { languageVersion = JavaLanguageVersion.of(21) }
+  toolchain {
+    languageVersion = JavaLanguageVersion.of(21)
+  }
 }
 
 repositories {
@@ -30,46 +32,25 @@ dependencies {
   implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0'
 
   // --- Persistence
-
-
-
-  // --- Persistence
-
-
-  // --- Persistence
-
-
-  compileOnly 'org.projectlombok:lombok:1.18.34'
-  annotationProcessor 'org.projectlombok:lombok:1.18.34'
-
-  testCompileOnly 'org.projectlombok:lombok:1.18.34'
-  testAnnotationProcessor 'org.projectlombok:lombok:1.18.34'
-
-
   implementation 'org.springframework.boot:spring-boot-starter-jdbc'
-  runtimeOnly  'org.postgresql:postgresql'             // versiyonu Boot BOM yönetir
+  runtimeOnly  'org.postgresql:postgresql' // versiyonu Boot BOM yönetir
 
   // --- Migrations
   implementation 'org.flywaydb:flyway-core'
   implementation 'org.flywaydb:flyway-database-postgresql'
 
   // --- Lombok (main + test)
-  compileOnly          'org.projectlombok:lombok:1.18.34'
-  annotationProcessor  'org.projectlombok:lombok:1.18.34'
-  testCompileOnly      'org.projectlombok:lombok:1.18.34'
+  compileOnly             'org.projectlombok:lombok:1.18.34'
+  annotationProcessor     'org.projectlombok:lombok:1.18.34'
+  testCompileOnly         'org.projectlombok:lombok:1.18.34'
   testAnnotationProcessor 'org.projectlombok:lombok:1.18.34'
 
   // --- Testing
-  testImplementation 'org.springframework.boot:spring-boot-starter-test'   // JUnit + AssertJ + Mockito + MockMvc
+  testImplementation 'org.springframework.boot:spring-boot-starter-test'
   testImplementation "org.springframework.boot:spring-boot-testcontainers"
   testImplementation "org.testcontainers:junit-jupiter:${testcontainersVersion}"
   testImplementation "org.testcontainers:postgresql:${testcontainersVersion}"
   testImplementation 'com.h2database:h2'
-
-
-  // Eğer JUnit sürümünü sabitlemek istersen (opsiyonel):
-  // testImplementation platform("org.junit:junit-bom:5.10.2")
-  // testImplementation "org.junit.jupiter:junit-jupiter"
 }
 
 dependencyManagement {
