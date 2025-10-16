@@ -1,6 +1,12 @@
+# ---- build stage ----
+FROM gradle:8.9-jdk21 AS build
+WORKDIR /src
+COPY ../../ .
+RUN gradle :core:payment-service:bootJar -x test
+
+# ---- runtime ----
 FROM eclipse-temurin:21-jre
 WORKDIR /app
-ARG JAR=build/libs/*.jar
-COPY ${JAR} app.jar
-EXPOSE 9003
+COPY --from=build /src/core/payment-service/build/libs/*.jar app.jar
+EXPOSE 9095
 ENTRYPOINT ["java","-jar","/app/app.jar"]
