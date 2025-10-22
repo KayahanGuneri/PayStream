@@ -1,52 +1,83 @@
 package com.paystream.paymentservice.infra.dao;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.paystream.paymentservice.app.port.OutboxPort;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataAccessException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
-import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public class JdbcOutboxPort implements OutboxPort{
+@RequiredArgsConstructor
+public class JdbcOutboxPort {
 
-    private final NamedParameterJdbcTemplate jdbc;
-    private final ObjectMapper objectMapper;
+    private final JdbcTemplate jdbc;
 
-    public JdbcOutboxPort(NamedParameterJdbcTemplate jdbc, ObjectMapper objectMapper) {
-        this.jdbc = jdbc;
-        this.objectMapper = objectMapper;
+    @Transactional(propagation = Propagation.MANDATORY)
+    public UUID publishEvent(
+            UUID aggregateId,
+            String aggregateType,
+            String eventType,
+            String payloadJson,
+            String metadataJson
+    ) {
+        try {
+            final String sql = """
+                INSERT INTO payment.outbox_events
+                  (id, aggregate_type, aggregate_id, event_type, payload, metadata, headers, occurred_at, status, published, created_at)
+                VALUES
+                  (?::uuid, ?, ?::uuid, ?, ?::jsonb, ?::jsonb, NULL, now(), 'NEW', FALSE, now())
+                RETURNING id
+                """;
+
+            // 1) id'yi üret
+            UUID id = UUID.randomUUID();
+
+            // 2) queryForObject'a 6 parametreyi DOĞRU sırayla ver
+            return jdbc.queryForObject(
+                    sql,
+                    (rs, rowNum) -> (UUID) rs.getObject(1, java.util.UUID.class),
+                    id,               // <-- id (1. placeholder)
+                    aggregateType,    // aggregate_type
+                    aggregateId,      // aggregate_id
+                    eventType,        // event_type
+                    payloadJson,      // payload  (geçerli JSON string olmalı)
+                    metadataJson      // metadata (null olabilir -> NULL::jsonb olarak cast edilir)
+            );
+
+        } catch (DataAccessException ex) {
+            throw ex;
+        }
     }
 
-    @Override
-    public void appendEvent(String aggregateType, String aggregateId,
-                            String eventType, Map<String, Object> payload, Instant occurredAt) {
+    @Transactional
+    public int markPublished(UUID outboxId) {
         final String sql = """
-            INSERT INTO outbox_events
-              (id, aggregate_type, aggregate_id, event_type, payload, headers, occurred_at, status)
-            VALUES
-              (:id, :atype, :aid, :etype, CAST(:payload AS JSONB), NULL, :occurredAt, 'NEW')
+            UPDATE payment.outbox_events
+               SET status='PUBLISHED', published=TRUE, published_at = now()
+             WHERE id=?::uuid AND status='NEW'
             """;
+        return jdbc.update(sql, outboxId);
+    }
 
-        String payloadJson;
-        try {
-            payloadJson = objectMapper.writeValueAsString(payload);
-        } catch (JsonProcessingException e) {
-            throw new IllegalArgumentException("Failed to serialize outbox payload", e);
-        }
+    @Transactional
+    public int markFailed(UUID outboxId, String errorMessage) {
+        final String sql = """
+            UPDATE payment.outbox_events
+               SET status='FAILED', error=?
+             WHERE id=?::uuid AND status='NEW'
+            """;
+        return jdbc.update(sql, errorMessage, outboxId);
+    }
 
-        MapSqlParameterSource p = new MapSqlParameterSource()
-                .addValue("id", UUID.randomUUID())
-                .addValue("atype", aggregateType)
-                .addValue("aid", UUID.fromString(aggregateId))
-                .addValue("etype", eventType)
-                .addValue("payload", payloadJson)
-                .addValue("occurredAt", occurredAt);
-
-        jdbc.update(sql, p);
+    @Transactional(readOnly = true)
+    public Optional<UUID> exists(UUID outboxId) {
+        final String sql = "SELECT id FROM payment.outbox_events WHERE id=?::uuid";
+        return jdbc.query(sql,
+                rs -> rs.next() ? Optional.of((UUID) rs.getObject("id")) : Optional.empty(),
+                outboxId);
     }
 }

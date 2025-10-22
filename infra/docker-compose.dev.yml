@@ -1,15 +1,8 @@
-version: "3.9"
 name: paystream-dev
 
-# -----------------------------
-# Networks
-# -----------------------------
 networks:
   paystream-net:
 
-# -----------------------------
-# Services
-# -----------------------------
 services:
   # ---------- Infra ----------
   postgres:
@@ -26,10 +19,7 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      # Debezium kullanıcısı ve yetkileri için init scriptler
       - ./initdb:/docker-entrypoint-initdb.d
-      # (opsiyonel) kalıcı veri:
-      # - ./volumes/postgres:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
@@ -42,26 +32,22 @@ services:
     container_name: ps-zookeeper
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
-    ports:
-      - "2181:2181"
+    ports: ["2181:2181"]
     networks: [paystream-net]
 
   kafka:
     image: confluentinc/cp-kafka:7.6.1
     container_name: ps-kafka
     depends_on:
-      zookeeper:
-        condition: service_started
+      zookeeper: { condition: service_started }
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      # İç/dış listener'lar (container içi: kafka:9092, host: localhost:29092)
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-    ports:
-      - "29092:29092"
+    ports: ["29092:29092"]
     healthcheck:
       test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
       interval: 10s
@@ -69,44 +55,10 @@ services:
       retries: 10
     networks: [paystream-net]
 
-  connect:
-    image: debezium/connect:2.6
-    container_name: ps-connect
-    depends_on:
-      kafka:
-        condition: service_started
-      postgres:
-        condition: service_healthy
-    environment:
-      BOOTSTRAP_SERVERS: kafka:9092
-      GROUP_ID: "1"
-      CONFIG_STORAGE_TOPIC: _connect_configs
-      OFFSET_STORAGE_TOPIC: _connect_offsets
-      STATUS_STORAGE_TOPIC: _connect_statuses
-      KEY_CONVERTER_SCHEMAS_ENABLE: "false"
-      VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
-    ports:
-      - "8083:8083"
-    networks: [paystream-net]
-
-  kafka-ui:
-    image: provectuslabs/kafka-ui:latest
-    container_name: ps-kafka-ui
-    depends_on:
-      kafka:
-        condition: service_started
-    environment:
-      KAFKA_CLUSTERS_0_NAME: local
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
-    ports:
-      - "8080:8080"
-    networks: [paystream-net]
-
   redis:
     image: redis:7
     container_name: ps-redis
-    ports:
-      - "6379:6379"
+    ports: ["6379:6379"]
     networks: [paystream-net]
 
   keycloak:
@@ -116,8 +68,7 @@ services:
     environment:
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
-    ports:
-      - "8081:8081"
+    ports: ["8081:8081"]
     networks: [paystream-net]
 
   weaviate:
@@ -125,100 +76,118 @@ services:
     container_name: ps-weaviate
     environment:
       AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
-    ports:
-      - "8082:8080"
+    ports: ["8082:8080"]
+    networks: [paystream-net]
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: ps-kafka-ui
+    depends_on:
+      kafka: { condition: service_started }
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    ports: ["8080:8080"]
     networks: [paystream-net]
 
   # ---------- Platform Apps ----------
   service-registry:
     container_name: ps-eureka
     build:
-      context: ../platform/service-registry
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: platform/service-registry/Dockerfile
     environment:
       SPRING_PROFILES_ACTIVE: docker
-    ports:
-      - "8761:8761"
-    depends_on: []
+    ports: ["8761:8761"]
     networks: [paystream-net]
 
   api-gateway:
     container_name: ps-gateway
     build:
-      context: ../platform/api-gateway
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: platform/api-gateway/Dockerfile
     environment:
       SPRING_PROFILES_ACTIVE: docker
       EUREKA_URL: http://service-registry:8761/eureka
-    ports:
-      - "8084:8080"   # host:8084 → gateway (istersen 8080'ı da kullanabilirsin)
+    ports: ["8084:8080"]
     depends_on:
-      service-registry:
-        condition: service_started
-      account-service:
-        condition: service_started
+      service-registry: { condition: service_started }
     networks: [paystream-net]
 
   # ---------- Core Apps ----------
   account-service:
     container_name: ps-account
     build:
-      context: ../                      # <— KÖK DİZİN
+      context: ..
       dockerfile: core/account-service/Dockerfile
     environment:
       SPRING_PROFILES_ACTIVE: docker
       EUREKA_URL: http://service-registry:8761/eureka
       SERVER_PORT: 9000
-      LOGGING_LEVEL_ROOT: DEBUG
-      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK: DEBUG
-      SERVER_ERROR_INCLUDE_MESSAGE: ALWAYS
-      SERVER_ERROR_INCLUDE_STACKTRACE: ALWAYS
-      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: loggers,health,info
-
-
-    ports: [ "9000:9000" ]
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/paystream
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+    ports: ["9000:9000"]
     depends_on:
       postgres: { condition: service_healthy }
       service-registry: { condition: service_started }
-    networks: [ paystream-net ]
-
+    networks: [paystream-net]
 
   ledger-service:
     container_name: ps-ledger
     build:
-      context: ../
+      context: ..
       dockerfile: core/ledger-service/Dockerfile
     environment:
       SPRING_PROFILES_ACTIVE: docker
       SERVER_PORT: 9100
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/paystream
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://service-registry:8761/eureka
+    ports: ["9100:9100"]
     depends_on:
       postgres: { condition: service_healthy }
       kafka: { condition: service_started }
       service-registry: { condition: service_started }
-    ports: [ "9100:9100" ]
-    networks: [ paystream-net ]
+    networks: [paystream-net]
 
   transfer-service:
     container_name: ps-transfer
     build:
-      context: ../
+      context: ..
       dockerfile: core/transfer-service/Dockerfile
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://service-registry:8761/eureka
-      # (opsiyonel) doğrudan datasource’u da env ile sabitlemek istersen:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/paystream
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+    ports: ["8085:8085"]
     depends_on:
       postgres: { condition: service_healthy }
       kafka: { condition: service_started }
       service-registry: { condition: service_started }
       ledger-service: { condition: service_started }
-    ports: [ "8085:8085" ]
-    networks: [ paystream-net ]
+    networks: [paystream-net]
+
+  payment-service:
+    container_name: ps-payment
+    build:
+      context: ..
+      dockerfile: core/payment-service/Dockerfile
+    image: paystream/payment-service:dev
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/paystream
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://service-registry:8761/eureka
+    ports: ["9095:9095"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_started }
+      service-registry: { condition: service_started }
+    restart: unless-stopped
+    networks: [paystream-net]
