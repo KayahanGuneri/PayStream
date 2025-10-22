@@ -1,11 +1,14 @@
 package com.paystream.paymentservice.api.dto;
 
-//Minimal stub response; will evolve with providerRef/status/links
-public record AuthorizeResponse (
-        String paymentId,
-        String status
-){
-        public static AuthorizeResponse stub(){
-            return new AuthorizeResponse("stub-payment-id","AUTH_PENDING");
-        }
+import com.paystream.paymentservice.domain.PaymentStatus;
+
+import java.util.UUID;
+
+public record AuthorizeResponse(
+        UUID paymentId,
+        PaymentStatus status
+) {
+    public static AuthorizeResponse of(UUID id, PaymentStatus status) {
+        return new AuthorizeResponse(id, status);
+    }
 }

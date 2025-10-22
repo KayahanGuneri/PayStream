@@ -1,11 +1,11 @@
 package com.paystream.paymentservice.api.dto;
 
+import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 
-// SRP: Carries only request data for authorization
 public record AuthorizeRequest(
-        String merchantId,
-        BigDecimal amount, // BigDecimal for monetary precision (scale=2)
-        String currency,   // ISO-4217
-        String cardToken
-) { }
+        @NotBlank String merchantId,
+        @NotNull @DecimalMin(value = "0.01") BigDecimal amount,
+        @NotBlank @Size(min = 3, max = 3) String currency, // ISO-4217 (TRY, USD, EUR...)
+        @NotBlank String cardToken
+) {}

@@ -1,109 +1,106 @@
 package com.paystream.paymentservice.infra.dao;
 
-import com.paystream.paymentservice.app.port.PaymentRepository;
-import com.paystream.paymentservice.common.exception.DuplicateRequestException;
-import org.springframework.dao.DuplicateKeyException;
+import com.paystream.paymentservice.domain.PaymentStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
-@Repository // Data access component for payments using JDBC
-public class JdbcPaymentRepository implements PaymentRepository {
+@Repository
+public class JdbcPaymentRepository {
 
-    private final NamedParameterJdbcTemplate jdbc;
+    private final JdbcTemplate jdbc;
 
-    public JdbcPaymentRepository(NamedParameterJdbcTemplate jdbc) {
-        // DIP: infrastructure detail injected by Spring
+    public JdbcPaymentRepository(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
     }
 
-    private static final RowMapper<PaymentRecord> PAYMENT_MAPPER = new RowMapper<>() {
-        @Override public PaymentRecord mapRow(ResultSet rs, int rowNum) throws SQLException {
-            // Map row to a lightweight record to avoid leaking ORM entities
-            return new PaymentRecord(
-                    rs.getString("id"),
-                    rs.getString("merchant_id"),
-                    rs.getBigDecimal("amount"),
-                    rs.getString("currency"),
-                    rs.getString("status"),
-                    rs.getString("card_token"),
-                    (Integer) rs.getObject("risk_score")
-            );
-        }
-    };
+    /**
+     * payments tablosuna yeni kayıt ekler.
+     * Şema: payment.payments(id, merchant_id, amount, currency, status, card_token, idempotency_key, created_at, updated_at)
+     */
+    public void savePayment(UUID id,
+                            UUID merchantId,
+                            BigDecimal amount,
+                            String currency,
+                            PaymentStatus status,
+                            String cardToken,
+                            String idempotencyKey) {
 
-    @Override
-    public UUID create(String merchantId, BigDecimal amount, String currency,
-                       String cardToken, String idempotencyKey, String initialStatus, Instant now) {
-        // Use explicit id to keep idempotent upserts simple (RETURNING keeps it atomic)
-        final String sql = """
-            INSERT INTO payments
-              (id, merchant_id, amount, currency, status, card_token, risk_score,
-               idempotency_key, version, created_at, updated_at)
+        jdbc.update("""
+            INSERT INTO payment.payments
+              (id, merchant_id, amount, currency, status, card_token, idempotency_key, created_at, updated_at)
             VALUES
-              (:id, :mid, :amount, :cur, :status, :token, NULL, :idem, 0, :now, :now)
-            RETURNING id
-            """;
-
-        UUID id = UUID.randomUUID();
-        MapSqlParameterSource p = new MapSqlParameterSource()
-                .addValue("id", id)
-                .addValue("mid", UUID.fromString(merchantId))
-                .addValue("amount", amount)
-                .addValue("cur", currency)
-                .addValue("status", initialStatus)
-                .addValue("token", cardToken)
-                .addValue("idem", idempotencyKey)
-                .addValue("now", now);
-        try {
-            return jdbc.queryForObject(sql, p, UUID.class);
-        } catch (DuplicateKeyException e) {
-            // Unique (merchant_id, idempotency_key) violated → map to domain exception
-            throw new DuplicateRequestException("Idempotency conflict for merchantId=" + merchantId);
-        }
+              (?,  ?,           ?,      ?,        ?,      ?,          ?,               now(),    now())
+            """,
+                id,
+                merchantId,                 // UUID tipinde
+                amount,
+                currency,
+                status.name(),
+                cardToken,
+                idempotencyKey
+        );
     }
 
-    @Override
-    public Optional<PaymentRecord> findById(String paymentId) {
-        final String sql = """
-            SELECT id, merchant_id, amount, currency, status, card_token, risk_score
-            FROM payments WHERE id = :id
-            """;
-        return jdbc.query(sql,
-                new MapSqlParameterSource("id", UUID.fromString(paymentId)),
-                PAYMENT_MAPPER).stream().findFirst();
+    /**
+     * payments.status alanını günceller.
+     */
+    public void updateStatus(UUID id, PaymentStatus nextStatus) {
+        jdbc.update("""
+            UPDATE payment.payments
+               SET status = ?, updated_at = now()
+             WHERE id = ?
+            """,
+                nextStatus.name(),
+                id
+        );
     }
 
-    @Override
-    public Optional<PaymentRecord> findByIdemKey(String merchantId, String idempotencyKey) {
-        final String sql = """
-            SELECT id, merchant_id, amount, currency, status, card_token, risk_score
-            FROM payments WHERE merchant_id = :mid AND idempotency_key = :idem
-            """;
-        MapSqlParameterSource p = new MapSqlParameterSource()
-                .addValue("mid", UUID.fromString(merchantId))
-                .addValue("idem", idempotencyKey);
-        return jdbc.query(sql, p, PAYMENT_MAPPER).stream().findFirst();
+    /**
+     * Tek bir ödemeyi id ile döndürür.
+     */
+    public Optional<PaymentRecord> findById(UUID id) {
+        return jdbc.query("""
+                SELECT id,
+                       merchant_id,
+                       amount,
+                       currency,
+                       status,
+                       card_token,
+                       idempotency_key,
+                       created_at
+                  FROM payment.payments
+                 WHERE id = ?
+                """, MAPPER, id
+        ).stream().findFirst();
     }
 
-    @Override
-    public void updateStatus(String paymentId, String newStatus, Instant now) {
-        final String sql = """
-            UPDATE payments
-               SET status = :status, updated_at = :now, version = version + 1
-             WHERE id = :id
-            """;
-        jdbc.update(sql, new MapSqlParameterSource()
-                .addValue("status", newStatus)
-                .addValue("now", now)
-                .addValue("id", UUID.fromString(paymentId)));
-    }
+    // RowMapper
+    private static final RowMapper<PaymentRecord> MAPPER = (ResultSet rs, int rowNum) -> new PaymentRecord(
+            rs.getObject("id", UUID.class),
+            rs.getObject("merchant_id", UUID.class),
+            rs.getBigDecimal("amount"),
+            rs.getString("currency"),
+            PaymentStatus.valueOf(rs.getString("status")),
+            rs.getString("card_token"),
+            rs.getString("idempotency_key"),
+            rs.getTimestamp("created_at").toInstant()
+    );
+
+    public record PaymentRecord(
+            UUID id,
+            UUID merchantId,
+            BigDecimal amount,
+            String currency,
+            PaymentStatus status,
+            String cardToken,
+            String idempotencyKey,
+            Instant createdAt
+    ) {}
 }

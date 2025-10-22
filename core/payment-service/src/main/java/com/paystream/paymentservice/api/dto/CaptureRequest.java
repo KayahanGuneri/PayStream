@@ -1,6 +1,8 @@
 package com.paystream.paymentservice.api.dto;
 
+import java.math.BigDecimal;
 
-// Capture can be partial; idempotency recommended via header
-public class CaptureRequest {
-}
+
+public record CaptureRequest(
+        BigDecimal amount
+) {}
