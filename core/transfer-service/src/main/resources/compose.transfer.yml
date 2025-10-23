@@ -1,0 +1,21 @@
+services:
+  transfer-service:
+    image: paystream-dev-transfer-service
+    container_name: ps-transfer
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      EUREKA_URL: http://ps-eureka:8761/eureka
+      SPRING_DATASOURCE_URL: jdbc:postgresql://ps-postgres:5432/paystream?currentSchema=public
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: ps-kafka:9092
+      LEDGER_BASE_URL: http://ps-ledger:9100
+      REDIS_HOST: ps-redis
+      REDIS_PORT: "6379"
+    ports:
+      - "8085:8085"
+    networks:
+      - paystream-net     # Aşağıdaki networks bölümüne dikkat!
+
+networks:
+  paystream-net:
+    external: true
+    name: paystream-dev_paystream-net
