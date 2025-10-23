@@ -1,3 +1,4 @@
+# core/transfer-service/src/main/resources/application-docker.yml
 server:
   port: 8085
   error:
@@ -9,10 +10,14 @@ server:
       prefix: access_log
       pattern: '%h %l %u %t "%r" %s %b %D'
 
-# core/transfer-service/src/main/resources/application-docker.yml
 spring:
+  application:
+    name: transfer-service
+
   datasource:
-    url: jdbc:postgresql://postgres:5432/paystream?currentSchema=public
+    # paystream-dev ağındaki Postgres container adı: ps-postgres
+    url: jdbc:postgresql://ps-postgres:5432/paystream?currentSchema=public
+
   flyway:
     schemas: public
     default-schema: public
@@ -20,27 +25,28 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
     baseline-version: 0
+
   cloud:
     loadbalancer:
-      enabled: false          # we do NOT use discovery here
-
+      enabled: false  # discovery kullanmıyoruz
 
   kafka:
-    bootstrap-servers: kafka:9092
-  application:
-    name: transfer-service
-
-
-ledger:
-  base-url: http://ledger-service:9100
+    # Kafka container adı: ps-kafka
+    bootstrap-servers: ps-kafka:9092
 
 eureka:
   client:
     serviceUrl:
-      defaultZone: ${EUREKA_URL:http://service-registry:8761/eureka}
+      # Eureka container adı: ps-eureka
+      defaultZone: ${EUREKA_URL:http://ps-eureka:8761/eureka}
+
+ledger:
+  # Ledger container adı: ps-ledger
+  base-url: http://ps-ledger:9100
 
 redis:
-  host: redis
+  # Redis container adı: ps-redis
+  host: ps-redis
   port: 6379
 
 logging:
