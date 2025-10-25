@@ -1,27 +1,36 @@
 plugins {
-  id 'org.springframework.boot'        // <- versiyon YOK (root'tan 3.3.2 gelecek)
-  id 'io.spring.dependency-management' // <- versiyon YOK
+  id 'org.springframework.boot'            // versiyonu root'taki pluginManagement belirler
+  id 'io.spring.dependency-management'
   id 'java'
+  id 'jacoco'
 }
 
 group = 'com.paystream'
 version = '0.0.1-SNAPSHOT'
 
-java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
+java {
+  toolchain { languageVersion = JavaLanguageVersion.of(21) }
+}
 
-repositories { mavenCentral() }
+repositories {
+  mavenCentral()
+}
 
 ext {
-  springCloudVersion = "2023.0.3"
+  springCloudVersion    = "2023.0.3"
   testcontainersVersion = "1.20.2"
 }
 
 dependencies {
+  // --- Application starters
   implementation 'org.springframework.boot:spring-boot-starter-web'
   implementation 'org.springframework.boot:spring-boot-starter-validation'
   implementation 'org.springframework.boot:spring-boot-starter-actuator'
   implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
   implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0'
+
+
+  // --- Persistence
 
 
   compileOnly 'org.projectlombok:lombok:1.18.34'
@@ -32,14 +41,29 @@ dependencies {
 
 
   implementation 'org.springframework.boot:spring-boot-starter-jdbc'
-  runtimeOnly  'org.postgresql:postgresql'
+  runtimeOnly  'org.postgresql:postgresql'             // versiyonu Boot BOM yönetir
 
+  // --- Migrations
   implementation 'org.flywaydb:flyway-core'
   implementation 'org.flywaydb:flyway-database-postgresql'
 
-  testImplementation 'org.springframework.boot:spring-boot-starter-test'
+  // --- Lombok (main + test)
+  compileOnly          'org.projectlombok:lombok:1.18.34'
+  annotationProcessor  'org.projectlombok:lombok:1.18.34'
+  testCompileOnly      'org.projectlombok:lombok:1.18.34'
+  testAnnotationProcessor 'org.projectlombok:lombok:1.18.34'
+
+  // --- Testing
+  testImplementation 'org.springframework.boot:spring-boot-starter-test'   // JUnit + AssertJ + Mockito + MockMvc
+  testImplementation "org.springframework.boot:spring-boot-testcontainers"
   testImplementation "org.testcontainers:junit-jupiter:${testcontainersVersion}"
   testImplementation "org.testcontainers:postgresql:${testcontainersVersion}"
+  testImplementation 'com.h2database:h2'
+
+
+  // Eğer JUnit sürümünü sabitlemek istersen (opsiyonel):
+  // testImplementation platform("org.junit:junit-bom:5.10.2")
+  // testImplementation "org.junit.jupiter:junit-jupiter"
 }
 
 dependencyManagement {
@@ -48,6 +72,24 @@ dependencyManagement {
   }
 }
 
-tasks.withType(Test).configureEach { useJUnitPlatform() }
-tasks.named('jar') { enabled = false }
+tasks.withType(Test).configureEach {
+  useJUnitPlatform()
+  finalizedBy tasks.jacocoTestReport // testten sonra coverage raporu üret
+}
+
+jacoco {
+  toolVersion = "0.8.11"
+}
+
+jacocoTestReport {
+  dependsOn test
+  reports {
+    xml.required = true
+    html.required = true
+    csv.required = false
+  }
+}
+
+// Boot uygulaması olduğu için sadece bootJar üretelim
+tasks.named('jar')     { enabled = false }
 tasks.named('bootJar') { enabled = true }
