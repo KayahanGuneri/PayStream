@@ -4,6 +4,7 @@ import com.paystream.ledgerservice.config.TestKafkaConfig;
 import com.paystream.ledgerservice.domain.LedgerEntry;
 import com.paystream.ledgerservice.infra.repo.AccountSnapshotRepository;
 import com.paystream.ledgerservice.infra.repo.LedgerEntryRepository;
+import com.paystream.ledgerservice.infra.repo.LedgerEntryRepository.InsertResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,8 +13,9 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
-import java.util.*;
-
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -22,17 +24,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Import(TestKafkaConfig.class)
 class ReconciliationIT extends PostgresContainerSupport {
 
-    @BeforeEach
-    void cleanDb() {
-        // Sıra önemli değil, FK yoksa TRUNCATE yeterli
-        jdbc.update("TRUNCATE TABLE account_snapshots");
-        jdbc.update("TRUNCATE TABLE ledger_entries");
-    }
-
-
     @Autowired LedgerEntryRepository ledgerRepo;
     @Autowired AccountSnapshotRepository snapshots;
     @Autowired JdbcTemplate jdbc;
+
+    @BeforeEach
+    void cleanDb() {
+        // FK yoksa TRUNCATE yeter; varsa CASCADE düşünebilirsin.
+        jdbc.update("TRUNCATE TABLE account_snapshots");
+        jdbc.update("TRUNCATE TABLE ledger_entries");
+    }
 
     @Test
     void ledger_sum_equals_snapshot_and_idempotent() {
@@ -60,7 +61,7 @@ class ReconciliationIT extends PostgresContainerSupport {
         """, rs -> {
             Map<Key, Long> m = new HashMap<>();
             while (rs.next()) {
-                Key k = new Key((UUID)rs.getObject("account_id"), rs.getString("currency"));
+                Key k = new Key((UUID) rs.getObject("account_id"), rs.getString("currency"));
                 m.put(k, rs.getLong("s"));
             }
             return m;
@@ -73,7 +74,7 @@ class ReconciliationIT extends PostgresContainerSupport {
         """, rs -> {
             Map<Key, Long> m = new HashMap<>();
             while (rs.next()) {
-                Key k = new Key((UUID)rs.getObject("account_id"), rs.getString("currency"));
+                Key k = new Key((UUID) rs.getObject("account_id"), rs.getString("currency"));
                 m.put(k, rs.getLong("balance_minor"));
             }
             return m;
@@ -85,7 +86,7 @@ class ReconciliationIT extends PostgresContainerSupport {
         // 4) Idempotency: aynı event'i tekrar uygula -> değişmemeli
         long before = snapshotBalances.get(new Key(accA, TRY));
         snapshots.applyDelta(accA, TRY, -1000, o1); // duplicate (aynı offset)
-        long after = jdbc.queryForObject("""
+        Long after = jdbc.queryForObject("""
             SELECT balance_minor FROM account_snapshots
             WHERE account_id=? AND currency=?
         """, Long.class, accA, TRY);
@@ -97,9 +98,9 @@ class ReconciliationIT extends PostgresContainerSupport {
         UUID acc = UUID.randomUUID();
         String TRY = "TRY";
 
-        long o1 = insert(acc, TRY, +100, 0); // offset = o1
-        long o2 = insert(acc, TRY, +1000, 1); // offset = o2
-        long o3 = insert(acc, TRY, +50, 2);   // offset = o3  (o1 < o2 < o3)
+        long o1 = insert(acc, TRY, +100, 0);   // offset = o1
+        long o2 = insert(acc, TRY, +1000, 1);  // offset = o2
+        long o3 = insert(acc, TRY, +50, 2);    // offset = o3  (o1 < o2 < o3)
 
         // Snapshot uygulama sırasını karıştır: o1 → o3 → o2
         snapshots.applyDelta(acc, TRY, +100,  o1); // balance: 100,  offset=o1
@@ -107,18 +108,21 @@ class ReconciliationIT extends PostgresContainerSupport {
         snapshots.applyDelta(acc, TRY, +1000, o2); // o2 < o3 → NO-OP
 
         Long bal = jdbc.queryForObject("""
-        SELECT balance_minor FROM account_snapshots
-        WHERE account_id=? AND currency=?""", Long.class, acc, TRY);
+            SELECT balance_minor FROM account_snapshots
+            WHERE account_id=? AND currency=?
+        """, Long.class, acc, TRY);
         Long off = jdbc.queryForObject("""
-        SELECT as_of_ledger_offset FROM account_snapshots
-        WHERE account_id=? AND currency=?""", Long.class, acc, TRY);
+            SELECT as_of_ledger_offset FROM account_snapshots
+            WHERE account_id=? AND currency=?
+        """, Long.class, acc, TRY);
 
         assertThat(bal).isEqualTo(150L); // 100 + 50; o2 NO-OP
         assertThat(off).isEqualTo(o3);
     }
 
-
-
+    /**
+     * Ledger entry ekler ve DB/sequence tarafından üretilen ledger offset'i döner.
+     */
     private long insert(UUID accountId, String currency, long amountMinor, int txSeq) {
         LedgerEntry e = LedgerEntry.builder()
                 .entryId(UUID.randomUUID())
@@ -128,7 +132,11 @@ class ReconciliationIT extends PostgresContainerSupport {
                 .currency(currency)
                 .amountMinor(amountMinor)
                 .build();
-        return ledgerRepo.insert(e);
+
+        InsertResult res = ledgerRepo.upsert(e);
+
+
+        return res.offset();
     }
 
     private record Key(UUID accountId, String currency) { }
