@@ -1,3 +1,4 @@
+package com.paystream.paymentservice.common.exception;
 package com.paystream.paymentservice.api;
 
 import org.springframework.http.ResponseEntity;
