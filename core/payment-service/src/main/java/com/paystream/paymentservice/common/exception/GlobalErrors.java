@@ -1,5 +1,7 @@
 package com.paystream.paymentservice.common.exception;
 
+package com.paystream.paymentservice.api;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
