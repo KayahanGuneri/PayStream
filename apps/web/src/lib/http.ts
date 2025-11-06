@@ -2,6 +2,11 @@
    HTTP istemcisi (fetch wrapper). Vite proxy ile Gateway'e '/api' tabanı üzerinden gider.
    Tüm isteklerde x-correlation-id ekler, yalnızca POST'ta idempotency-key ekler.
    401/403 → AuthError, 422 → ValidationError, diğer durumlar → ApiError fırlatır.
+
+   HTTP istemcisi (fetch wrapper). 
+   Tüm isteklerde x-correlation-id ekler. 
+   POST/PUT/PATCH isteklerinde idempotency-key ekler.
+   Hatalarda özel tipler (AuthError, ValidationError, ApiError) fırlatır.
 */
 
 import { AuthError, ValidationError, ApiError } from './errors';
@@ -60,6 +65,41 @@ export const http = {
   // GET /v1/...
   async get<T>(path: string, init?: RequestInit): Promise<T> {
     const res = await fetch(buildUrl(path), {
+=======
+// --- yardımcı uuid üretici ---
+function uuidv4() {
+  return crypto.randomUUID?.() ?? Math.random().toString(36).substring(2);
+}
+
+// --- ortak fetch handler ---
+async function handle<T>(res: Response): Promise<T> {
+  const text = await res.text();
+  let data: unknown = undefined;
+  try {
+    data = text ? JSON.parse(text) : undefined;
+  } catch {
+    data = text;
+  }
+
+  if (res.ok) return data as T;
+
+  // hata tipi sınıflandır
+  const { status } = res;
+  if (status === 401 || status === 403)
+    throw new AuthError('Unauthorized or forbidden', status, data);
+  if (status === 422)
+    throw new ValidationError('Validation failed', data);
+  function hasMessage(obj: unknown): obj is { message: string } {
+    return typeof obj === 'object' && obj !== null && 'message' in obj && typeof (obj as Record<string, unknown>)['message'] === 'string';
+  }
+  const msg = hasMessage(data) ? data.message : `HTTP ${status}`;
+  throw new ApiError(msg ?? 'Request failed', status, data);
+}
+
+// --- temel http nesnesi ---
+export const http = {
+  async get<T>(url: string, init?: RequestInit): Promise<T> {
+    const res = await fetch(url, {
       ...init,
       method: 'GET',
       headers: {
@@ -73,6 +113,9 @@ export const http = {
   // POST /v1/...  (idempotency-key only here)
   async post<T, B = unknown>(path: string, body: B, init?: RequestInit): Promise<T> {
     const res = await fetch(buildUrl(path), {
+
+  async post<T, B = unknown>(url: string, body: B, init?: RequestInit): Promise<T> {
+    const res = await fetch(url, {
       ...init,
       method: 'POST',
       headers: {
@@ -89,6 +132,8 @@ export const http = {
   // PUT /v1/...  (no idempotency-key as requested)
   async put<T, B = unknown>(path: string, body: B, init?: RequestInit): Promise<T> {
     const res = await fetch(buildUrl(path), {
+  async put<T, B = unknown>(url: string, body: B, init?: RequestInit): Promise<T> {
+    const res = await fetch(url, {
       ...init,
       method: 'PUT',
       headers: {
@@ -104,6 +149,8 @@ export const http = {
   // DELETE /v1/...
   async delete<T>(path: string, init?: RequestInit): Promise<T> {
     const res = await fetch(buildUrl(path), {
+  async delete<T>(url: string, init?: RequestInit): Promise<T> {
+    const res = await fetch(url, {
       ...init,
       method: 'DELETE',
       headers: {
