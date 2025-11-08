@@ -17,6 +17,7 @@ public class GlobalErrors {
         return ResponseEntity.badRequest().body(Map.of(
                 "error", ex.getMessage()
         ));
+
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
