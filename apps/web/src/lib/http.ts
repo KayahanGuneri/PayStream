@@ -3,6 +3,7 @@
    Tüm isteklerde x-correlation-id ekler, yalnızca POST'ta idempotency-key ekler.
    401/403 → AuthError, 422 → ValidationError, diğer durumlar → ApiError fırlatır.
 
+
    HTTP istemcisi (fetch wrapper). 
    Tüm isteklerde x-correlation-id ekler. 
    POST/PUT/PATCH isteklerinde idempotency-key ekler.
@@ -65,7 +66,7 @@ export const http = {
   // GET /v1/...
   async get<T>(path: string, init?: RequestInit): Promise<T> {
     const res = await fetch(buildUrl(path), {
-=======
+
 // --- yardımcı uuid üretici ---
 function uuidv4() {
   return crypto.randomUUID?.() ?? Math.random().toString(36).substring(2);
@@ -114,6 +115,7 @@ export const http = {
   async post<T, B = unknown>(path: string, body: B, init?: RequestInit): Promise<T> {
     const res = await fetch(buildUrl(path), {
 
+
   async post<T, B = unknown>(url: string, body: B, init?: RequestInit): Promise<T> {
     const res = await fetch(url, {
       ...init,
@@ -132,6 +134,7 @@ export const http = {
   // PUT /v1/...  (no idempotency-key as requested)
   async put<T, B = unknown>(path: string, body: B, init?: RequestInit): Promise<T> {
     const res = await fetch(buildUrl(path), {
+
   async put<T, B = unknown>(url: string, body: B, init?: RequestInit): Promise<T> {
     const res = await fetch(url, {
       ...init,
@@ -149,6 +152,7 @@ export const http = {
   // DELETE /v1/...
   async delete<T>(path: string, init?: RequestInit): Promise<T> {
     const res = await fetch(buildUrl(path), {
+
   async delete<T>(url: string, init?: RequestInit): Promise<T> {
     const res = await fetch(url, {
       ...init,
