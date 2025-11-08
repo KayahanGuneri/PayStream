@@ -11,6 +11,14 @@ import { CustomersNewPage } from '../pages/CustomersNew';
 import { CustomerDetailsPage } from '../pages/CustomerDetailsPage';
 import { RouteError } from './RouteError'; // moved to separate file to fix react-refresh rule
 
+   Router tanımı. RootLayout altında Home ve Accounts sayfaları bulunur.
+*/
+import React from 'react';
+import { createBrowserRouter } from 'react-router-dom';
+import { RootLayout } from './layouts/RootLayout.tsx';
+import { Home } from '../pages/Home.tsx';
+import { Accounts } from '../pages/Accounts.tsx';
+
 export const router = createBrowserRouter([
   {
     path: '/',
@@ -23,6 +31,10 @@ export const router = createBrowserRouter([
       // Customers
       { path: 'customers/new', element: <CustomersNewPage /> },
       { path: 'customers/:id', element: <CustomerDetailsPage /> },
+
+    children: [
+      { index: true, element: <Home /> },
+      { path: 'accounts', element: <Accounts /> },
     ],
   },
 ]);

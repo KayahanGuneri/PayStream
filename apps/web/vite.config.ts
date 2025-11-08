@@ -14,6 +14,13 @@ export default defineConfig({
         target: 'http://localhost:9000',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
+
+      // everything under /api goes to gateway
+      '/api': {
+        target: 'http://localhost:8084',
+        changeOrigin: true,
+        // if your gateway serves /api already, you can leave rewrite as is
+        // rewrite: (path) => path, // no-op
       },
     },
   },
