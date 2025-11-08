@@ -1,24 +1,28 @@
 /* Türkçe Özet:
-   Uygulama genel sağlayıcıları: React Query QueryClientProvider ve sonner Toaster.
-   (İleride SocketProvider gibi başka global sağlayıcılar burada birleştirilebilir.)
+   Uygulamanın kök sağlayıcıları: React Query QueryClientProvider + sonner Toaster.
+   (İsteğe bağlı) React Query Devtools kapalı başlatılır.
 */
-import React from 'react';
-import { QueryClientProvider } from '@tanstack/react-query';
+import React, { type PropsWithChildren } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
-import { createQueryClient } from '../lib/queryClient';
 
-// Keep a single client instance
-const queryClient = createQueryClient();
+// Create a single QueryClient instance for the whole app
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Avoid too aggressive refetching; tune as you wish
+      refetchOnWindowFocus: false,
+      retry: 1, // Most of our hooks already gate retries via guards
+    },
+  },
+});
 
-type AppProvidersProps = {
-  children: React.ReactNode;
-};
-
-export const AppProviders: React.FC<AppProvidersProps> = ({ children }) => {
+export const AppProviders: React.FC<PropsWithChildren> = ({ children }) => {
+  // Wrap the entire app with QueryClientProvider
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Global toast portal */}
-      <Toaster richColors />
+      {/* Toast system */}
+      <Toaster richColors closeButton />
       {children}
     </QueryClientProvider>
   );
