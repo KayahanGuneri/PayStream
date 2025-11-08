@@ -11,6 +11,7 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalErrors {
 
+
     @ExceptionHandler(IllegalArgumentException.class)
     ResponseEntity<Map<String, Object>> onIllegalArgument(IllegalArgumentException ex) {
         return ResponseEntity.badRequest().body(Map.of(
