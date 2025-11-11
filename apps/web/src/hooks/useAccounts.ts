@@ -49,12 +49,16 @@ const isAuthOrValidation = (err: unknown) =>
  * POST /v1/customers/{customerId}/accounts
  */
 
+
+
+
+
 // 401/403/422 tekrar deneme dışı
 const isAuthOrValidation = (err: unknown) =>
   err instanceof ValidationError || err instanceof AuthError;
 
 // export function useAccountsList(customerId: string) { ... }
-
+ 
 export function useCreateAccount() {
   const qc = useQueryClient();
 
@@ -65,9 +69,13 @@ export function useCreateAccount() {
       return await http.post<CreateAccountResponse, { currency: string }>(
         `/v1/customers/${encodeURIComponent(body.customerId)}/accounts`,
 
+
+
+
       // Backend sözleşmesi: POST /v1/customers/{customerId}/accounts
       return await http.post<CreateAccountResponse, { currency: string }>(
         `/api/v1/customers/${encodeURIComponent(body.customerId)}/accounts`,
+
         { currency: body.currency }
       );
     },
@@ -77,10 +85,15 @@ export function useCreateAccount() {
       await qc.invalidateQueries({ queryKey: ['accounts', 'balance', { accountId: data.id }] });
       // Future: if a "list by customer" exists, also invalidate:
 
+
+
+
+
       // Liste yok, yine de tekil account ve balance cache’lerini tazeleyebiliriz.
       await qc.invalidateQueries({ queryKey: ['accounts', 'byId', { accountId: data.id }] });
       await qc.invalidateQueries({ queryKey: ['accounts', 'balance', { accountId: data.id }] });
       // İleride "list by customer" gelirse şunu ekleriz:
+
       // await qc.invalidateQueries({ queryKey: ['accounts', 'list', { customerId: variables.customerId }] });
     },
     retry: (count: number, err: unknown) => !isAuthOrValidation(err) && count < 1,
@@ -91,6 +104,8 @@ export function useCreateAccount() {
  * GET /v1/accounts/{accountId}
  */
 
+
+
 // Tekil hesap GET /v1/accounts/{accountId}
  
 export function useAccount(accountId: string) {
@@ -99,6 +114,9 @@ export function useAccount(accountId: string) {
     enabled: !!accountId,
     queryFn: async () =>
       await http.get<AccountDTO>(`/v1/accounts/${encodeURIComponent(accountId)}`),
+
+
+
 
       await http.get<AccountDTO>(`/api/v1/accounts/${encodeURIComponent(accountId)}`),
     staleTime: 30_000,
@@ -109,6 +127,10 @@ export function useAccount(accountId: string) {
 /**
  * GET /v1/accounts/{accountId}/balance
  */
+
+
+
+
 // Bakiye GET /v1/accounts/{accountId}/balance
 
 export function useAccountBalance(accountId: string) {
@@ -117,6 +139,10 @@ export function useAccountBalance(accountId: string) {
     enabled: !!accountId,
     queryFn: async () =>
       await http.get<AccountBalanceDTO>(`/v1/accounts/${encodeURIComponent(accountId)}/balance`),
+
+
+
+
 
       await http.get<AccountBalanceDTO>(
         `/api/v1/accounts/${encodeURIComponent(accountId)}/balance`
