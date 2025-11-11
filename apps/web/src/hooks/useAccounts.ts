@@ -50,6 +50,9 @@ const isAuthOrValidation = (err: unknown) =>
  */
 
 
+
+
+
 // 401/403/422 tekrar deneme dışı
 const isAuthOrValidation = (err: unknown) =>
   err instanceof ValidationError || err instanceof AuthError;
@@ -67,6 +70,8 @@ export function useCreateAccount() {
         `/v1/customers/${encodeURIComponent(body.customerId)}/accounts`,
 
 
+
+
       // Backend sözleşmesi: POST /v1/customers/{customerId}/accounts
       return await http.post<CreateAccountResponse, { currency: string }>(
         `/api/v1/customers/${encodeURIComponent(body.customerId)}/accounts`,
@@ -79,6 +84,9 @@ export function useCreateAccount() {
       await qc.invalidateQueries({ queryKey: ['accounts', 'byId', { accountId: data.id }] });
       await qc.invalidateQueries({ queryKey: ['accounts', 'balance', { accountId: data.id }] });
       // Future: if a "list by customer" exists, also invalidate:
+
+
+
 
 
       // Liste yok, yine de tekil account ve balance cache’lerini tazeleyebiliriz.
@@ -97,6 +105,7 @@ export function useCreateAccount() {
  */
 
 
+
 // Tekil hesap GET /v1/accounts/{accountId}
  
 export function useAccount(accountId: string) {
@@ -105,6 +114,8 @@ export function useAccount(accountId: string) {
     enabled: !!accountId,
     queryFn: async () =>
       await http.get<AccountDTO>(`/v1/accounts/${encodeURIComponent(accountId)}`),
+
+
 
 
       await http.get<AccountDTO>(`/api/v1/accounts/${encodeURIComponent(accountId)}`),
@@ -117,6 +128,9 @@ export function useAccount(accountId: string) {
  * GET /v1/accounts/{accountId}/balance
  */
 
+
+
+
 // Bakiye GET /v1/accounts/{accountId}/balance
 
 export function useAccountBalance(accountId: string) {
@@ -125,6 +139,9 @@ export function useAccountBalance(accountId: string) {
     enabled: !!accountId,
     queryFn: async () =>
       await http.get<AccountBalanceDTO>(`/v1/accounts/${encodeURIComponent(accountId)}/balance`),
+
+
+
 
 
       await http.get<AccountBalanceDTO>(
