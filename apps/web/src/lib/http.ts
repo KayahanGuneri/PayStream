@@ -2,12 +2,6 @@
    HTTP istemcisi (fetch wrapper). Vite proxy ile Gateway'e '/api' tabanı üzerinden gider.
    Tüm isteklerde x-correlation-id ekler, yalnızca POST'ta idempotency-key ekler.
    401/403 → AuthError, 422 → ValidationError, diğer durumlar → ApiError fırlatır.
-
-
-   HTTP istemcisi (fetch wrapper). 
-   Tüm isteklerde x-correlation-id ekler. 
-   POST/PUT/PATCH isteklerinde idempotency-key ekler.
-   Hatalarda özel tipler (AuthError, ValidationError, ApiError) fırlatır.
 */
 
 import { AuthError, ValidationError, ApiError } from './errors';
@@ -15,10 +9,10 @@ import { AuthError, ValidationError, ApiError } from './errors';
 // Generate a correlation/idempotency id
 function uuidv4(): string {
   // Use crypto if available; fallback provides uniqueness only for dev
-  return (globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2));
+  return globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2);
 }
 
-// Base path that Vite proxy forwards to http://localhost:8084
+// Base path that Vite proxy forwards to http://localhost:8084 (or your target)
 const API_BASE = '/api';
 
 // Ensure paths always start with a single slash then join with base
@@ -31,7 +25,11 @@ function buildUrl(path: string): string {
 async function parseBody(res: Response): Promise<unknown> {
   const text = await res.text();
   if (!text) return undefined;
-  try { return JSON.parse(text); } catch { return text; }
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
 }
 
 // Map HTTP errors to our error classes
@@ -62,45 +60,18 @@ async function handle<T>(res: Response): Promise<T> {
   throw new ApiError(message, status, data);
 }
 
-export const http = {
-  // GET /v1/...
+// We define the full shape explicitly so TypeScript never “forgets” methods.
+export type HttpClient = {
+  get<T>(path: string, init?: RequestInit): Promise<T>;
+  post<T, B = unknown>(path: string, body: B, init?: RequestInit): Promise<T>;
+  put<T, B = unknown>(path: string, body: B, init?: RequestInit): Promise<T>;
+  delete<T>(path: string, init?: RequestInit): Promise<T>;
+};
+
+// Full http client with GET/POST/PUT/DELETE
+export const http: HttpClient = {
   async get<T>(path: string, init?: RequestInit): Promise<T> {
     const res = await fetch(buildUrl(path), {
-
-// --- yardımcı uuid üretici ---
-function uuidv4() {
-  return crypto.randomUUID?.() ?? Math.random().toString(36).substring(2);
-}
-
-// --- ortak fetch handler ---
-async function handle<T>(res: Response): Promise<T> {
-  const text = await res.text();
-  let data: unknown = undefined;
-  try {
-    data = text ? JSON.parse(text) : undefined;
-  } catch {
-    data = text;
-  }
-
-  if (res.ok) return data as T;
-
-  // hata tipi sınıflandır
-  const { status } = res;
-  if (status === 401 || status === 403)
-    throw new AuthError('Unauthorized or forbidden', status, data);
-  if (status === 422)
-    throw new ValidationError('Validation failed', data);
-  function hasMessage(obj: unknown): obj is { message: string } {
-    return typeof obj === 'object' && obj !== null && 'message' in obj && typeof (obj as Record<string, unknown>)['message'] === 'string';
-  }
-  const msg = hasMessage(data) ? data.message : `HTTP ${status}`;
-  throw new ApiError(msg ?? 'Request failed', status, data);
-}
-
-// --- temel http nesnesi ---
-export const http = {
-  async get<T>(url: string, init?: RequestInit): Promise<T> {
-    const res = await fetch(url, {
       ...init,
       method: 'GET',
       headers: {
@@ -111,19 +82,14 @@ export const http = {
     return handle<T>(res);
   },
 
-  // POST /v1/...  (idempotency-key only here)
   async post<T, B = unknown>(path: string, body: B, init?: RequestInit): Promise<T> {
     const res = await fetch(buildUrl(path), {
-
-
-  async post<T, B = unknown>(url: string, body: B, init?: RequestInit): Promise<T> {
-    const res = await fetch(url, {
       ...init,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-correlation-id': uuidv4(),
-        'idempotency-key': uuidv4(),
+        'idempotency-key': uuidv4(), // Only for POST
         ...(init?.headers ?? {}),
       },
       body: JSON.stringify(body),
@@ -131,12 +97,8 @@ export const http = {
     return handle<T>(res);
   },
 
-  // PUT /v1/...  (no idempotency-key as requested)
   async put<T, B = unknown>(path: string, body: B, init?: RequestInit): Promise<T> {
     const res = await fetch(buildUrl(path), {
-
-  async put<T, B = unknown>(url: string, body: B, init?: RequestInit): Promise<T> {
-    const res = await fetch(url, {
       ...init,
       method: 'PUT',
       headers: {
@@ -149,12 +111,8 @@ export const http = {
     return handle<T>(res);
   },
 
-  // DELETE /v1/...
   async delete<T>(path: string, init?: RequestInit): Promise<T> {
     const res = await fetch(buildUrl(path), {
-
-  async delete<T>(url: string, init?: RequestInit): Promise<T> {
-    const res = await fetch(url, {
       ...init,
       method: 'DELETE',
       headers: {

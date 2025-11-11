@@ -13,17 +13,11 @@ export const RootLayout: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-
-  return (
-    <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="sticky top-0 z-10 border-b bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2">
-            <img src="/brand/logo-primary.png" alt="PayStream" className="h-8 w-auto" />
-            <span className="font-semibold text-blue-600 text-lg">PayStream</span>
-
             <img
               src="/brand/logo-primary.png"
               alt="PayStream"
@@ -44,31 +38,6 @@ export const RootLayout: React.FC = () => {
             </NavLink>
             <NavLink to="/customers/new" className={({ isActive }) => linkClass(isActive)}>
               Customers
-            </NavLink>
-
-            <NavLink
-              to="/"
-              className={({ isActive }) =>
-                `px-2 py-1 ${
-                  isActive
-                    ? 'font-semibold text-blue-600'
-                    : 'text-gray-700 hover:text-gray-900'
-                }`
-              }
-            >
-              Home
-            </NavLink>
-            <NavLink
-              to="/accounts"
-              className={({ isActive }) =>
-                `px-2 py-1 ${
-                  isActive
-                    ? 'font-semibold text-blue-600'
-                    : 'text-gray-700 hover:text-gray-900'
-                }`
-              }
-            >
-              Accounts
             </NavLink>
           </nav>
         </div>

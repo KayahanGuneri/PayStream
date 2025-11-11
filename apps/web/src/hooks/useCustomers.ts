@@ -6,10 +6,9 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { http } from '../lib/http';
-import { AuthError, ValidationError} from '../lib/errors';
+import { AuthError, ValidationError } from '../lib/errors';
 
-// --------- DTOs (FE projection) ---------
-
+// ---------- DTOs (FE projection) ----------
 export type CustomerDTO = {
   id: string;
   name: string;
@@ -25,9 +24,7 @@ export type CreateCustomerBody = {
 
 export type CreateCustomerResponse = CustomerDTO;
 
-// --------- Helpers ---------
-
-// Guard to avoid retry on auth/validation errors
+// ---------- Helpers ----------
 const isAuthOrValidation = (err: unknown) =>
   err instanceof ValidationError || err instanceof AuthError;
 
@@ -44,7 +41,7 @@ export function extractFieldErrors(error: unknown): Record<string, string> {
   return {};
 }
 
-// --------- Hooks ---------
+// ---------- Hooks ----------
 
 // POST /api/v1/customers
 export function useCreateCustomer() {
@@ -53,9 +50,10 @@ export function useCreateCustomer() {
   return useMutation<CreateCustomerResponse, unknown, CreateCustomerBody>({
     mutationKey: ['customers', 'create'],
     mutationFn: async (body) =>
-      await http.post<CreateCustomerResponse, CreateCustomerBody>('/v1/customers', body),
+      // NOTE: http automatically prefixes '/api'
+      http.post<CreateCustomerResponse, CreateCustomerBody>('/v1/customers', body),
     onSuccess: async (data) => {
-      // Invalidate the detail cache for the new id (if present anywhere).
+      // Invalidate any detail cache possibly referencing this id.
       await qc.invalidateQueries({ queryKey: ['customers', 'byId', { id: data.id }] });
     },
     retry: (count: number, err: unknown) => !isAuthOrValidation(err) && count < 1,
@@ -67,9 +65,8 @@ export function useCustomer(id: string) {
   return useQuery<CustomerDTO, unknown>({
     queryKey: ['customers', 'byId', { id }],
     enabled: !!id, // Do not run without an id
-    queryFn: async () => await http.get<CustomerDTO>(`/v1/customers/${encodeURIComponent(id)}`),
-    // Give a little breathing room. Customer data rarely changes often.
-    staleTime: 60_000,
+    queryFn: async () => http.get<CustomerDTO>(`/v1/customers/${encodeURIComponent(id)}`),
+    staleTime: 60_000, // Customer rarely changes
     retry: (count: number, err: unknown) => !isAuthOrValidation(err) && count < 1,
   });
 }

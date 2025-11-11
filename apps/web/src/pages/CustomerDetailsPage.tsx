@@ -1,6 +1,6 @@
 /* Türkçe Özet:
-   Tekil müşteri detay sayfası. URL parametresinden id okur, useCustomer ile yükler.
-   "Bu müşteri için hesap oluştur" butonuyla Accounts sayfasına yönlendirir.
+   Tekil müşteri detay sayfası. URL parametresinden id okur, veriyi useCustomer
+   ile yükler. "Bu müşteri için hesap oluştur" düğmesi sunar.
 */
 
 import React from 'react';
@@ -10,8 +10,11 @@ import { CustomerDetails } from '../features/customers/Details';
 import { ApiError } from '../lib/errors';
 
 export const CustomerDetailsPage: React.FC = () => {
+  // Read id from the route param
   const { id = '' } = useParams<{ id: string }>();
   const navigate = useNavigate();
+
+  // Fetch customer by id
   const { data, isLoading, error } = useCustomer(id);
 
   return (
@@ -32,17 +35,18 @@ export const CustomerDetailsPage: React.FC = () => {
       {/* Loading / Error states */}
       {isLoading && <div className="text-sm text-gray-600">Loading…</div>}
 
-      {error ? (
-        error instanceof ApiError ? (
-          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-            {error.message ?? 'Request failed.'}
-          </div>
-        ) : (
-          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-            Unexpected error while loading customer.
-          </div>
-        )
-      ) : null}
+      {/* Use Boolean(error) to avoid placing 'unknown' in JSX */}
+      {Boolean(error) && !(error instanceof ApiError) && (
+        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          Unexpected error while loading customer.
+        </div>
+      )}
+
+      {error instanceof ApiError && (
+        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          {error.message ?? 'Request failed.'}
+        </div>
+      )}
 
       {/* Content */}
       {data && (
