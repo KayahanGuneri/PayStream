@@ -1,47 +1,37 @@
-/* Türkçe Özet:
-   Yeni müşteri oluşturma sayfası. UI-only CreateCustomerForm bileşenini kompoze eder,
-   I/O için useCreateCustomer hook’unu kullanır. Başarıda toast gösterir ve istenirse
-   detay sayfasına yönlendirme yapar.
-*/
-
-import React, { useMemo } from 'react';
+// src/pages/CustomersNew.tsx
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import {CreateCustomerForm} from './Customers';
-import type {CreateCustomerValues} from './Customers';
+
+import { CreateCustomerForm } from './Customers';
+import type { CreateCustomerValues } from './Customers';
 import { useCreateCustomer, extractFieldErrors } from '../hooks/useCustomers';
 import { AuthError, ValidationError, ApiError } from '../lib/errors';
-
-function getMessage(error: unknown, fallback = 'Unexpected error.'): string {
-  // Safe message extraction from known error classes
-  if (
-    error instanceof AuthError ||
-    error instanceof ValidationError ||
-    error instanceof ApiError
-  ) {
-    return typeof (error as Error).message === 'string' ? (error as Error).message : fallback;
-  }
-  if (error instanceof Error && typeof error.message === 'string') return error.message;
-  if (typeof error === 'object' && error && 'message' in error) {
-    const m = (error as { message?: unknown }).message;
-    if (typeof m === 'string') return m;
-  }
-  if (typeof error === 'string') return error;
-  return fallback;
-}
 
 export const CustomersNewPage: React.FC = () => {
   const navigate = useNavigate();
   const createMutation = useCreateCustomer();
 
+  // “ID ile git” barı
+  const [gotoId, setGotoId] = useState('');
+
+  // 422 alan hatalarını forma yansıt
   const fieldErrors = useMemo(
     () => extractFieldErrors(createMutation.error),
     [createMutation.error]
   );
 
-  const handleCreate = async (values: CreateCustomerValues) => {
+  // “ID ile git” submit
+  const handleGoto = (e: React.FormEvent): void => {
+    e.preventDefault();
+    const id = gotoId.trim();
+    if (!id) return;
+    navigate(`/customers/${encodeURIComponent(id)}`);
+  };
+
+  // Customer create submit — Promise<void> olarak açıkça tanımlandı
+  const handleCreate = async (values: CreateCustomerValues): Promise<void> => {
     try {
-      // Optional trimming/normalization
       const payload = {
         name: values.name.trim(),
         email: values.email.trim().toLowerCase(),
@@ -50,22 +40,22 @@ export const CustomersNewPage: React.FC = () => {
 
       const created = await createMutation.mutateAsync(payload);
       toast.success('Customer created successfully.');
-      // Navigate to details
+      // Not: navigate bir şey döndürür ama biz return ETMİYORUZ
       navigate(`/customers/${encodeURIComponent(created.id)}`);
     } catch (err: unknown) {
       if (err instanceof AuthError) {
-        toast.error('Authentication/authorization required. (Redirect TODO)');
+        toast.error('Authentication/authorization required.');
         return;
       }
       if (err instanceof ValidationError) {
-        toast.warning(getMessage(err, 'Validation failed.'));
+        toast.warning((err as Error).message || 'Validation failed.');
         return;
       }
       if (err instanceof ApiError) {
-        toast.error(getMessage(err, 'Request failed.'));
+        toast.error((err as Error).message || 'Request failed.');
         return;
       }
-      toast.error(getMessage(err));
+      toast.error((err as Error)?.message ?? 'Unexpected error.');
     }
   };
 
@@ -79,24 +69,47 @@ export const CustomersNewPage: React.FC = () => {
           className="h-40 w-full object-cover sm:h-56"
         />
         <div className="p-6">
-          <h1 className="text-2xl font-bold">Create Customer</h1>
+          <h1 className="text-2xl font-bold">Create / Find Customer</h1>
           <p className="mt-2 text-gray-600">
-            Register a new customer to proceed with account creation and operations.
+            Create a new customer or open an existing one by ID.
           </p>
         </div>
       </div>
 
-      {/* UI-only form; IO comes from hook */}
+      {/* ID ile git barı */}
+      <form
+        onSubmit={handleGoto}
+        className="flex items-end gap-3 rounded-xl border bg-white p-4 shadow-sm"
+      >
+        <div className="flex-1">
+          <label className="block text-sm font-medium text-gray-700">
+            Open by Customer ID (UUID)
+          </label>
+          <input
+            type="text"
+            value={gotoId}
+            onChange={(e) => setGotoId(e.target.value)}
+            placeholder="00000000-0000-0000-0000-000000000000"
+            className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
+          />
+        </div>
+        <button
+          type="submit"
+          className="h-10 rounded-md bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-700"
+        >
+          Open
+        </button>
+      </form>
+
+      {/* Create form */}
       <CreateCustomerForm
         pending={createMutation.isPending}
-        onSubmit={handleCreate}
+        onSubmit={handleCreate} // (values) => Promise<void>
         fieldErrors={fieldErrors}
         generalErrorMessage={
           createMutation.error instanceof ValidationError
             ? undefined
-            : createMutation.error
-            ? getMessage(createMutation.error, 'Request failed.')
-            : undefined
+            : (createMutation.error as Error | undefined)?.message ?? undefined
         }
       />
     </div>
