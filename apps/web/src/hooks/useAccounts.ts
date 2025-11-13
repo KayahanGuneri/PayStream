@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { http } from '../lib/http';
 import { AuthError, ValidationError } from '../lib/errors';
 
-// ---- DTOs ----
+// ---- DTOs (Data Transfer Objects) ----
 export type AccountDTO = {
   id: string;
   currency: string;
@@ -10,8 +10,10 @@ export type AccountDTO = {
 };
 
 export type CreateAccountBody = {
-  customerId: string;  // URL içinde kullanılır
-  currency: string;    // örn: "TRY"
+  // Customer ID is used in the request URL
+  customerId: string;
+  // Example: "TRY"
+  currency: string;
 };
 
 export type CreateAccountResponse = AccountDTO;
@@ -23,104 +25,82 @@ export type AccountBalanceDTO = {
   updatedAt?: string;
 };
 
-// Retry guard: don't retry auth/validation
+// Retry rule: Do not retry for 401, 403, 422 errors
 const isAuthOrValidation = (err: unknown) =>
   err instanceof ValidationError || err instanceof AuthError;
 
-/** Create account: POST /v1/customers/{customerId}/accounts */
 /**
- * POST /v1/customers/{customerId}/accounts
+ * Create account
+ * Backend endpoint: POST /v1/customers/{customerId}/accounts
+ * Note: The `http` wrapper automatically prefixes all requests with `/api`
  */
-
-
-
-
-
-// 401/403/422 tekrar deneme dışı
-const isAuthOrValidation = (err: unknown) =>
-  err instanceof ValidationError || err instanceof AuthError;
-
-// export function useAccountsList(customerId: string) { ... }
- 
 export function useCreateAccount() {
   const qc = useQueryClient();
 
   return useMutation<CreateAccountResponse, unknown, CreateAccountBody>({
     mutationKey: ['accounts', 'create'],
+
     mutationFn: async (body) => {
       return await http.post<CreateAccountResponse, { currency: string }>(
         `/v1/customers/${encodeURIComponent(body.customerId)}/accounts`,
-
-
-
-
-      // Backend sözleşmesi: POST /v1/customers/{customerId}/accounts
-      return await http.post<CreateAccountResponse, { currency: string }>(
-        `/api/v1/customers/${encodeURIComponent(body.customerId)}/accounts`,
-
         { currency: body.currency }
       );
     },
+
     onSuccess: async (data) => {
-      // Invalidate caches that might contain this account
-      await qc.invalidateQueries({ queryKey: ['accounts', 'byId', { accountId: data.id }] });
-      await qc.invalidateQueries({ queryKey: ['accounts', 'balance', { accountId: data.id }] });
-      // Future: if a "list by customer" exists, also invalidate:
+      // Invalidate cache for the newly created account
+      await qc.invalidateQueries({
+        queryKey: ['accounts', 'byId', { accountId: data.id }],
+      });
 
+      // Invalidate cache for the account balance
+      await qc.invalidateQueries({
+        queryKey: ['accounts', 'balance', { accountId: data.id }],
+      });
 
-
-
-
-      // Liste yok, yine de tekil account ve balance cache’lerini tazeleyebiliriz.
-      await qc.invalidateQueries({ queryKey: ['accounts', 'byId', { accountId: data.id }] });
-      await qc.invalidateQueries({ queryKey: ['accounts', 'balance', { accountId: data.id }] });
+      // Future improvement: If a "list by customer" endpoint exists,
+      // invalidate the list query for that customer as well.
     },
-    retry: (count, err) => !isAuthOrValidation(err) && count < 1
+
+    // Retry only once for non-auth/validation errors
+    retry: (count, err) => !isAuthOrValidation(err) && count < 1,
   });
 }
 
-/** Get account by id: GET /v1/accounts/{accountId} */
 /**
- * GET /v1/accounts/{accountId}
+ * Fetch a single account
+ * Backend endpoint: GET /v1/accounts/{accountId}
  */
-
-
-
-// Tekil hesap GET /v1/accounts/{accountId}
- 
 export function useAccount(accountId: string) {
   return useQuery<AccountDTO, unknown>({
     queryKey: ['accounts', 'byId', { accountId }],
     enabled: !!accountId,
-    queryFn: async () => await http.get<AccountDTO>(`/v1/accounts/${encodeURIComponent(accountId)}`),
+
     queryFn: async () =>
-      await http.get<AccountDTO>(`/v1/accounts/${encodeURIComponent(accountId)}`),
+      await http.get<AccountDTO>(
+        `/v1/accounts/${encodeURIComponent(accountId)}`
+      ),
 
-
-
-
-      await http.get<AccountDTO>(`/api/v1/accounts/${encodeURIComponent(accountId)}`),
-    staleTime: 30_000,
-    retry: (count, err) => !isAuthOrValidation(err) && count < 1
+    staleTime: 30_000, // Cache stays fresh for 30 seconds
+    retry: (count, err) => !isAuthOrValidation(err) && count < 1,
   });
 }
 
-
+/**
+ * Fetch account balance
+ * Backend endpoint: GET /v1/accounts/{accountId}/balance
+ */
 export function useAccountBalance(accountId: string) {
   return useQuery<AccountBalanceDTO, unknown>({
     queryKey: ['accounts', 'balance', { accountId }],
     enabled: !!accountId,
+
     queryFn: async () =>
-      await http.get<AccountBalanceDTO>(`/v1/accounts/${encodeURIComponent(accountId)}/balance`),
-
-
-
-
-
       await http.get<AccountBalanceDTO>(
-        `/api/v1/accounts/${encodeURIComponent(accountId)}/balance`
+        `/v1/accounts/${encodeURIComponent(accountId)}/balance`
       ),
-    staleTime: 15_000,
-    retry: (count, err) => !isAuthOrValidation(err) && count < 1
+
+    staleTime: 15_000, // Refresh balance every 15 seconds
+    retry: (count, err) => !isAuthOrValidation(err) && count < 1,
   });
 }
