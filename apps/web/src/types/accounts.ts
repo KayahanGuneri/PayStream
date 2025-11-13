@@ -1,30 +1,42 @@
-/* Türkçe Özet:
-   Accounts modülü için ortak tipler. Form değerleri, istek/yanıt DTO’ları
-   gibi tipler burada tutulur ve UI/hook/feature katmanları buradan kullanır.
-*/
+// Türkçe Özet: Accounts modülü için kesin DTO tipleri. Create body formdan hem customerId hem currency alır.
+// Balance yanıtı MINOR (tam sayı) birimlerinde gelir; raw (snake_case) → UI-normalized (camelCase) dönüşümü hook içinde yapılır.
 
-// Form values used by Create Account UI
 export type CreateAccountFormValues = {
   customerId: string;
   currency: string; // e.g., "TRY" (3-letter uppercase)
 };
 
-// (Opsiyonel) Hook'lar ile uyumlu olması için ekleyebiliriz.
-// FE tarafında POST body genelde form ile aynı.
-export type CreateAccountBody = CreateAccountFormValues;
-
-// (Opsiyonel) Liste/yanıt projeksiyonları — backend’den teyit bekler.
-export type AccountDTO = {
-  id: string;
+// ⬇️ FIX: CreateAccountBody, mutation çağrısında formdan gelen her iki alanı da içerir.
+// Hook, path'te customerId'yi kullanır; request body'de sadece { currency } gönderir.
+export type CreateAccountBody = {
+  customerId: string;
   currency: string;
-  status: string; // e.g., ACTIVE | BLOCKED | CLOSED
-  // TODO: createdAt / iban gibi alanlar var mı?
 };
 
+// Backend AccountResponse used by both read and create
+export type AccountDTO = {
+  id: string;
+  currency: string;                  // ISO 4217, e.g., TRY
+  status: string;                    // ACTIVE | BLOCKED | CLOSED
+  // NOTE: Add createdAt etc. when backend exposes them.
+};
+
+export type CreateAccountResponse = AccountDTO;
+
+// -------- Balance DTOs (raw vs normalized) --------
+
+// Raw response shape from API (snake_case, MINOR units).
+export type AccountBalanceRawDTO = {
+  account_id: string;
+  balance_minor: number;             // integer, MINOR units
+  as_of_ledger_offset: number | null;
+  updated_at: string | null;
+};
+
+// UI-normalized shape (camelCase), still MINOR units authoritative.
 export type AccountBalanceDTO = {
   accountId: string;
-  currentBalance?: number;
-  asOfLedgerOffset?: number;
-  updatedAt?: string;
-  // TODO: minor/major dönüşümü gerekirse belirt.
+  balanceMinor: number;              // integer, MINOR units
+  asOfLedgerOffset?: number | null;
+  updatedAt?: string | null;
 };

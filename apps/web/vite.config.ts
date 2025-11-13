@@ -6,10 +6,10 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// Frontend -> Gateway proxy: /api → http://localhost:8084
 export default defineConfig({
   plugins: [react()],
   server: {
+    port: 5173,
     proxy: {
 
       '/api': {
@@ -21,10 +21,11 @@ export default defineConfig({
 
       // everything under /api goes to gateway
       '/api': {
-        target: 'http://localhost:8084',
-        changeOrigin: true
-        // rewrite gerekmez; http.ts zaten '/api' ile başlatıyor.
-      }
-    }
-  }
+        target: 'http://localhost:9000',
+        changeOrigin: true,
+        
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+    },
+  },
 });

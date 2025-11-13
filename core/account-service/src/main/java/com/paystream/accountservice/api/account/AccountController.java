@@ -1,6 +1,5 @@
 package com.paystream.accountservice.api.account;
 
-import com.paystream.accountservice.api.account.AccountResponse;
 import com.paystream.accountservice.app.account.AccountAppService;
 import com.paystream.accountservice.infra.dao.account.AccountDao;
 import jakarta.validation.Valid;

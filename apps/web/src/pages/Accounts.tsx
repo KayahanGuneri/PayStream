@@ -1,19 +1,25 @@
-/* Türkçe Özet:
-   Accounts sayfası; hero, query’den customerId/accountId okur.
-   Liste uç noktası olmadığı için bilgilendirme gösterir.
-   Create sonrası dönen accountId ile tekil hesap ve bakiye görüntülenir.
-*/
+// src/pages/Accounts.tsx
+// Türkçe Özet:
+// Accounts sayfasının nihai sürümü. Üstte hero görseli, altında (varsa) tekil hesap listesi,
+// bakiye kartı ve "Create Account" formu bulunur. Bilgilendirici Alert mesajları kaldırıldı.
+// UI sadeleştirildi, işlev (create → detail → balance) akışı korunuyor.
 
 import React, { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
+
 import { AccountsList } from '../features/accounts/List';
 import { CreateForm } from '../features/accounts/CreateForm';
 import type { CreateAccountFormValues } from '../types/accounts';
+
 import { useCreateAccount, useAccount, useAccountBalance } from '../hooks/useAccounts';
 import { AuthError, ValidationError, ApiError } from '../lib/errors';
 
-// Safe message extractor
+import { Hero } from '../components/Hero';
+import { Card } from '../components/Card';
+import { EmptyState } from '../components/EmptyState';
+
+// Safely extract a human-readable message from various error shapes
 function getMessage(error: unknown, fallback = 'Unexpected error.'): string {
   if (error instanceof AuthError || error instanceof ValidationError || error instanceof ApiError) {
     return typeof error.message === 'string' ? error.message : fallback;
@@ -27,142 +33,138 @@ function getMessage(error: unknown, fallback = 'Unexpected error.'): string {
   return fallback;
 }
 
+// Read per-field errors from a ValidationError.data payload (supports {errors} or {fieldErrors})
 function getFieldErrors(error: unknown): Record<string, string> {
   if (error instanceof ValidationError) {
     const d = (error as ValidationError & { data?: unknown }).data;
     if (d && typeof d === 'object') {
       const obj = d as Record<string, unknown>;
-      if ('errors' in obj) {
-        const maybeErrors = obj['errors'];
-        if (maybeErrors && typeof maybeErrors === 'object') {
-          return maybeErrors as Record<string, string>;
-        }
+      if ('errors' in obj && typeof obj.errors === 'object' && obj.errors) {
+        return obj.errors as Record<string, string>;
       }
-      if ('fieldErrors' in obj) {
-        const maybeFieldErrors = obj['fieldErrors'];
-        if (maybeFieldErrors && typeof maybeFieldErrors === 'object') {
-          return maybeFieldErrors as Record<string, string>;
-        }
+      if ('fieldErrors' in obj && typeof obj.fieldErrors === 'object' && obj.fieldErrors) {
+        return obj.fieldErrors as Record<string, string>;
       }
     }
   }
   return {};
 }
 
+// Helper: convert MINOR units to major with 2 decimals (e.g., 12345 → 123.45)
+function formatMinor(amountMinor: number | undefined | null, currency: string): string {
+  if (amountMinor == null) return '-';
+  const major = amountMinor / 100;
+  return `${major.toFixed(2)} ${currency}`;
+}
+
 export const Accounts: React.FC = () => {
+  // Read URL params to optionally pre-fill customerId or show a specific account
   const [params, setParams] = useSearchParams();
-  const customerId = params.get('customerId') ?? '';
+  const customerIdFromUrl = params.get('customerId') ?? '';
   const accountIdParam = params.get('accountId') ?? '';
 
-  // After create, hold the returned id so we can show it
+  // Hold the last created account id to drive detail + balance after creation
   const [lastCreatedId, setLastCreatedId] = useState<string>(accountIdParam);
 
-  // Create mutation
-  const createMutation = useCreateAccount();
-
-  // Load single account + balance if we have an id (from query or last created)
+  // Mutations & queries
+  const createMutation = useCreateAccount(); // NOTE: your hook currently reads customerId from the submitted body
   const activeAccountId = lastCreatedId || accountIdParam;
+
+  // Fetch account detail and balance only when we have an id
   const { data: account } = useAccount(activeAccountId);
   const { data: balance } = useAccountBalance(activeAccountId);
 
+  // Compute per-field errors when create fails with 422
   const fieldErrors = useMemo(() => getFieldErrors(createMutation.error), [createMutation.error]);
 
+  // Create handler wires the UI-only form to the mutation
   const handleCreate = async (values: CreateAccountFormValues) => {
     try {
+      if (!values.customerId) {
+        toast.warning('Please enter a valid customerId.');
+        return;
+      }
+
+      // Uppercase currency to keep a clean convention (TRY, USD, EUR, ...)
       const res = await createMutation.mutateAsync({
         customerId: values.customerId,
-        currency: values.currency,
+        currency: values.currency.toUpperCase(),
       });
+
       toast.success('Account created.');
       setLastCreatedId(res.id);
 
-      // put accountId to the URL for deep-linking convenience
+      // Deep-link convenience: reflect newly created account + customer in URL
       const next = new URLSearchParams(params);
       next.set('accountId', res.id);
+      next.set('customerId', values.customerId);
       setParams(next, { replace: true });
     } catch (err: unknown) {
       if (err instanceof AuthError) {
         toast.error('Authentication/authorization required. (Redirect TODO)');
-        return;
-      }
-      if (err instanceof ValidationError) {
+      } else if (err instanceof ValidationError) {
         toast.warning(getMessage(err, 'Validation failed.'));
-        return;
-      }
-      if (err instanceof ApiError) {
+      } else if (err instanceof ApiError) {
         toast.error(getMessage(err, 'Request failed.'));
-        return;
+      } else {
+        toast.error(getMessage(err));
       }
-      toast.error(getMessage(err));
     }
   };
 
   return (
-    <div className="space-y-8">
-      {/* Hero */}
-      <div className="overflow-hidden rounded-2xl border bg-white shadow-sm">
-        <img
-          src="/brand/banner-accounts.png"
-          alt="Accounts Banner"
-          className="h-48 w-full object-cover sm:h-64"
-        />
-        <div className="p-6">
-          <h1 className="text-2xl font-bold">Accounts</h1>
-          <p className="mt-2 text-gray-600">Create an account and inspect its details/balance.</p>
-        </div>
-      </div>
-
-      {/* No list endpoint info */}
-      <div className="rounded-xl border bg-amber-50 p-4 text-sm text-amber-900">
-        <strong>Note:</strong> Backend doesn’t expose “list by customer” yet. You can create an
-        account and then view its details/balance. If you already have an account, use{' '}
-        <code>?accountId=&lt;uuid&gt;</code> in the URL.
-      </div>
-
-      {/* Optional hint for missing customerId */}
-      {!customerId && (
-        <div className="rounded-xl border bg-yellow-50 p-4 text-sm text-yellow-900">
-          No <code>customerId</code> specified. Add <code>?customerId=&lt;uuid&gt;</code> to create
-          an account for a specific customer.
-        </div>
-      )}
-
-      {/* “List” area shows either the created account or the account from the query */}
-      <AccountsList
-        accounts={
-          activeAccountId && account
-            ? [{ id: account.id, currency: account.currency, status: account.status }]
-            : []
-        }
-        isLoading={false}
-        error={undefined}
-        onRefresh={undefined}
+    <div className="space-y-6">
+      {/* Page hero */}
+      <Hero
+        imageSrc="/brand/banner-accounts.png"
+        imageAlt="Accounts Banner"
+        title="Accounts"
+        subtitle="Create an account and inspect its details/balance."
       />
 
-      {/* Balance (if accountId available) */}
+      {/* List area: show the single active account (if any), otherwise empty state */}
+      {activeAccountId && account ? (
+        <AccountsList
+          accounts={[{ id: account.id, currency: account.currency, status: account.status }]}
+          isLoading={false}
+          error={undefined}
+          onRefresh={undefined}
+        />
+      ) : (
+        <EmptyState
+          title="No accounts to show."
+          description="Create a new account to see it listed here."
+          imageSrc="/brand/account-service.png"
+          actionLabel={undefined}
+          onAction={undefined}
+        />
+      )}
+
+      {/* Balance card (renders only when we have an active account) */}
       {activeAccountId && (
-        <div className="rounded-xl border bg-white p-6 shadow-sm">
-          <h3 className="mb-2 text-base font-semibold">Balance</h3>
+        <Card title="Balance">
           {balance ? (
             <div className="text-sm">
               <div>
                 <span className="text-gray-500">Current:</span>{' '}
-                <span className="font-semibold">{balance.currentBalance ?? 0}</span>
+                <span className="font-semibold">
+                  {formatMinor(balance.balanceMinor, account?.currency ?? 'TRY')}
+                </span>
               </div>
               <div className="text-gray-500">
-                As of offset: {balance.asOfLedgerOffset ?? '-'} | Updated:{' '}
-                {balance.updatedAt ?? '-'}
+                As of offset: {balance.asOfLedgerOffset ?? 'Not available'} | Updated:{' '}
+                {balance.updatedAt ?? 'Not available'}
               </div>
             </div>
           ) : (
             <div className="text-sm text-gray-600">Loading balance…</div>
           )}
-        </div>
+        </Card>
       )}
 
-      {/* Create form */}
+      {/* Create form (UI-only) */}
       <CreateForm
-        initialCustomerId={customerId}
+        initialCustomerId={customerIdFromUrl}
         pending={createMutation.isPending}
         onSubmit={handleCreate}
         fieldErrors={fieldErrors}
