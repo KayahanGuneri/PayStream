@@ -1,18 +1,22 @@
-// src/pages/Accounts.tsx
 // Türkçe Özet:
-// Accounts sayfasının nihai sürümü. Üstte hero görseli, altında (varsa) tekil hesap listesi,
-// bakiye kartı ve "Create Account" formu bulunur. Bilgilendirici Alert mesajları kaldırıldı.
-// UI sadeleştirildi, işlev (create → detail → balance) akışı korunuyor.
+// Accounts sayfasının nihai sürümü. Üstte hero görseli, altında seçili müşteri için
+// hesap listesi, bakiye kartı ve "Create Account" formu bulunur. Liste gerçek
+// endpoint üzerinden gelir; loading skeleton, empty state ve error + retry desteği vardır.
+// AuthError durumunda toast gösterilir ve /login sayfasına yönlendirilir.
 
 import React, { useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { AccountsList } from '../features/accounts/List';
 import { CreateForm } from '../features/accounts/CreateForm';
 import type { CreateAccountFormValues } from '../types/accounts';
 
-import { useCreateAccount, useAccount, useAccountBalance } from '../hooks/useAccounts';
+import {
+  useCreateAccount,
+  useAccountBalance,
+  useAccountsList,
+} from '../hooks/useAccounts';
 import { AuthError, ValidationError, ApiError } from '../lib/errors';
 
 import { Hero } from '../components/Hero';
@@ -58,24 +62,35 @@ function formatMinor(amountMinor: number | undefined | null, currency: string): 
 }
 
 export const Accounts: React.FC = () => {
+  const navigate = useNavigate();
+
   // Read URL params to optionally pre-fill customerId or show a specific account
   const [params, setParams] = useSearchParams();
   const customerIdFromUrl = params.get('customerId') ?? '';
   const accountIdParam = params.get('accountId') ?? '';
 
-  // Hold the last created account id to drive detail + balance after creation
+  // Hold the last created account id to drive balance after creation
   const [lastCreatedId, setLastCreatedId] = useState<string>(accountIdParam);
 
-  // Mutations & queries
-  const createMutation = useCreateAccount(); // NOTE: your hook currently reads customerId from the submitted body
-  const activeAccountId = lastCreatedId || accountIdParam;
+  const hasCustomer = Boolean(customerIdFromUrl);
 
-  // Fetch account detail and balance only when we have an id
-  const { data: account } = useAccount(activeAccountId);
-  const { data: balance } = useAccountBalance(activeAccountId);
+  // Queries & mutations
+  const listQuery = useAccountsList(customerIdFromUrl);
+  const createMutation = useCreateAccount();
+
+  // Decide which account is "active" for balance widget
+  const activeAccountId =
+    lastCreatedId ||
+    accountIdParam ||
+    (listQuery.data && listQuery.data.length > 0 ? listQuery.data[0].id : '');
+
+  const balanceQuery = useAccountBalance(activeAccountId);
 
   // Compute per-field errors when create fails with 422
-  const fieldErrors = useMemo(() => getFieldErrors(createMutation.error), [createMutation.error]);
+  const fieldErrors = useMemo(
+    () => getFieldErrors(createMutation.error),
+    [createMutation.error]
+  );
 
   // Create handler wires the UI-only form to the mutation
   const handleCreate = async (values: CreateAccountFormValues) => {
@@ -101,8 +116,12 @@ export const Accounts: React.FC = () => {
       setParams(next, { replace: true });
     } catch (err: unknown) {
       if (err instanceof AuthError) {
-        toast.error('Authentication/authorization required. (Redirect TODO)');
-      } else if (err instanceof ValidationError) {
+        // AuthError → toast + redirect to /login
+        toast.error('Authentication/authorization required. Redirecting to login…');
+        navigate('/login');
+        return;
+      }
+      if (err instanceof ValidationError) {
         toast.warning(getMessage(err, 'Validation failed.'));
       } else if (err instanceof ApiError) {
         toast.error(getMessage(err, 'Request failed.'));
@@ -112,6 +131,14 @@ export const Accounts: React.FC = () => {
     }
   };
 
+  // General error message for CreateForm (non-422)
+  const generalErrorMessage =
+    createMutation.error instanceof ValidationError
+      ? undefined
+      : createMutation.error
+      ? getMessage(createMutation.error, 'Request failed.')
+      : undefined;
+
   return (
     <div className="space-y-6">
       {/* Page hero */}
@@ -119,45 +146,58 @@ export const Accounts: React.FC = () => {
         imageSrc="/brand/banner-accounts.png"
         imageAlt="Accounts Banner"
         title="Accounts"
-        subtitle="Create an account and inspect its details/balance."
+        subtitle="Create an account and inspect its details and balance."
       />
 
-      {/* List area: show the single active account (if any), otherwise empty state */}
-      {activeAccountId && account ? (
-        <AccountsList
-          accounts={[{ id: account.id, currency: account.currency, status: account.status }]}
-          isLoading={false}
-          error={undefined}
-          onRefresh={undefined}
-        />
-      ) : (
+      {/* If no customerId is provided, guide the user instead of hitting the list endpoint */}
+      {!hasCustomer && (
         <EmptyState
-          title="No accounts to show."
-          description="Create a new account to see it listed here."
+          title="No customer selected."
+          description="Open a customer from the Customers page and use the 'Create Account' button, or pass ?customerId=... in the URL."
           imageSrc="/brand/account-service.png"
-          actionLabel={undefined}
-          onAction={undefined}
         />
       )}
 
-      {/* Balance card (renders only when we have an active account) */}
+      {/* List area: only when we have a customerId */}
+      {hasCustomer && (
+        <AccountsList
+          accounts={listQuery.data ?? []}
+          isLoading={listQuery.isLoading}
+          error={listQuery.error}
+          onRefresh={listQuery.refetch}
+        />
+      )}
+
+      {/* Balance card (renders only when we have an active account id) */}
       {activeAccountId && (
         <Card title="Balance">
-          {balance ? (
+          {balanceQuery.isLoading && (
+            <div className="text-sm text-gray-600">Loading balance…</div>
+          )}
+
+          {!!balanceQuery.error && !balanceQuery.isLoading && (
+            <div className='text-sm text-red-700'>
+              Failed to load balance.Plase try again later.
+            </div>
+          )}
+
+          {balanceQuery.data && !balanceQuery.isLoading && !balanceQuery.error && (
             <div className="text-sm">
               <div>
                 <span className="text-gray-500">Current:</span>{' '}
                 <span className="font-semibold">
-                  {formatMinor(balance.balanceMinor, account?.currency ?? 'TRY')}
+                  {formatMinor(
+                    balanceQuery.data.balanceMinor,
+                    listQuery.data?.find((a) => a.id === activeAccountId)?.currency ?? 'TRY'
+                  )}
                 </span>
               </div>
               <div className="text-gray-500">
-                As of offset: {balance.asOfLedgerOffset ?? 'Not available'} | Updated:{' '}
-                {balance.updatedAt ?? 'Not available'}
+                As of offset:{' '}
+                {balanceQuery.data.asOfLedgerOffset ?? 'Not available'} | Updated:{' '}
+                {balanceQuery.data.updatedAt ?? 'Not available'}
               </div>
             </div>
-          ) : (
-            <div className="text-sm text-gray-600">Loading balance…</div>
           )}
         </Card>
       )}
@@ -168,13 +208,7 @@ export const Accounts: React.FC = () => {
         pending={createMutation.isPending}
         onSubmit={handleCreate}
         fieldErrors={fieldErrors}
-        generalErrorMessage={
-          createMutation.error instanceof ValidationError
-            ? undefined
-            : createMutation.error
-            ? getMessage(createMutation.error, 'Request failed.')
-            : undefined
-        }
+        generalErrorMessage={generalErrorMessage}
       />
     </div>
   );
