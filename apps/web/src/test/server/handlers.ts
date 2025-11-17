@@ -40,6 +40,13 @@ const handlers = [
     return HttpResponse.json(acc, { status: 200 });
   }),
 
+  /** ➤ GET /v1/customers/{cid}/accounts */
+  http.get('/api/v1/customers/:cid/accounts', ({ params }) => {
+    // Şimdilik müşteri bazlı filtre yapmıyoruz; eldeki tüm hesapları döneriz.
+    const list = Array.from(db.accounts.values());
+    return HttpResponse.json(list, { status: 200 });
+  }),
+
   /** ➤ GET /v1/accounts?customerId=... */
   http.get('/api/v1/accounts', ({ request }) => {
     const url = new URL(request.url);
@@ -66,4 +73,3 @@ const handlers = [
   })
 ];
 
-export const server = setupServer(...handlers);

@@ -1,4 +1,11 @@
 // Türkçe Özet:
+// Account servisinin React Query hook'ları. Hesap oluşturma, listeleme,
+// tekil hesap getirme ve bakiye sorgulama işlevlerini içerir.
+// 401/403 → AuthError, 422 → ValidationError dışındaki hatalar → ApiError.
+
+// English inline summary:
+// React Query hooks for Account operations (list, create, detail, balance).
+// 401/403 → AuthError, 422 → ValidationError. All other non-2xx → ApiError.
 // Account servisinin React Query hook'ları. Hesap oluşturma (create), listeleme (list),
 // tekil hesap getirme (byId) ve bakiye sorgulama (balance) işlerini üstlenir.
 // 401/403 → AuthError, 422 → ValidationError dışındaki hatalar → ApiError olarak ele alınır.
@@ -8,11 +15,13 @@ import { http } from '../lib/http';
 import { AuthError, ValidationError } from '../lib/errors';
 import type {
   AccountDTO,
+  AccountsListDTO,
   CreateAccountBody,
   CreateAccountResponse,
   AccountBalanceDTO,
   AccountBalanceRawDTO,
 } from '../types/accounts';
+
 
 // Simple alias for list response: backend returns an array of AccountDTO
 export type AccountsListDTO = AccountDTO[];
@@ -34,6 +43,8 @@ function mapBalance(raw: AccountBalanceRawDTO): AccountBalanceDTO {
 }
 
 /**
+ * List accounts for a given customer
+ * Backend endpoint: GET /v1/customers/{customerId}/accounts
  * List accounts for a given customer.
  * FE endpoint: GET /api/v1/accounts?customerId={id}
  * (Backend'te henüz yok, MSW ile simüle ediliyor.)
@@ -41,6 +52,13 @@ function mapBalance(raw: AccountBalanceRawDTO): AccountBalanceDTO {
 export function useAccountsList(customerId: string) {
   return useQuery<AccountsListDTO, unknown>({
     queryKey: ['accounts', 'list', { customerId }],
+    enabled: Boolean(customerId),
+    queryFn: async () =>
+      await http.get<AccountsListDTO>(
+        `/v1/customers/${encodeURIComponent(customerId)}/accounts`
+      ),
+    staleTime: 15_000,
+
     enabled: Boolean(customerId), // do not run without a customer id
     queryFn: async () =>
       await http.get<AccountsListDTO>(
@@ -50,6 +68,11 @@ export function useAccountsList(customerId: string) {
     retry: (count, err) => !isAuthOrValidation(err) && count < 1,
   });
 }
+
+
+/**
+ * Create account
+ * Backend endpoint: POST /v1/customers/{customerId}/accounts
 
 /**
  * Create account
@@ -65,11 +88,14 @@ export function useCreateAccount() {
     // The hook receives both customerId + currency,
     // but only currency is sent in the JSON body. customerId goes in the path.
     mutationFn: async (body) => {
-      return await http.post<CreateAccountResponse, { currency: string }>(
-        `/v1/customers/${encodeURIComponent(body.customerId)}/accounts`,
-        { currency: body.currency }
-      );
+      const url = `/v1/customers/${encodeURIComponent(body.customerId)}/accounts`;
+      return await http.post<CreateAccountResponse, { currency: string }>(url, {
+        currency: body.currency,
+      });
     },
+
+    // Invalidate detail + balance + list on success
+    onSuccess: async (data, variables) => {
 
     onSuccess: async (data, variables) => {
       // Invalidate detail cache for the newly created account
@@ -77,10 +103,10 @@ export function useCreateAccount() {
         queryKey: ['accounts', 'byId', { accountId: data.id }],
       });
 
-      // Invalidate cache for the account balance
       await qc.invalidateQueries({
         queryKey: ['accounts', 'balance', { accountId: data.id }],
       });
+
 
       // If list hook is used with this customer, refresh it as well
       await qc.invalidateQueries({
@@ -88,7 +114,6 @@ export function useCreateAccount() {
       });
     },
 
-    // Retry only once for non-auth/validation errors
     retry: (count, err) => !isAuthOrValidation(err) && count < 1,
   });
 }
@@ -100,14 +125,16 @@ export function useCreateAccount() {
 export function useAccount(accountId: string) {
   return useQuery<AccountDTO, unknown>({
     queryKey: ['accounts', 'byId', { accountId }],
+    enabled: Boolean(accountId),
+
     enabled: Boolean(accountId), // do not run when id is empty
 
-    queryFn: async () =>
-      await http.get<AccountDTO>(
-        `/v1/accounts/${encodeURIComponent(accountId)}`
-      ),
+    queryFn: async () => {
+      const url = `/v1/accounts/${encodeURIComponent(accountId)}`;
+      return await http.get<AccountDTO>(url);
+    },
 
-    staleTime: 30_000, // Cache stays fresh for 30 seconds
+    staleTime: 30_000,
     retry: (count, err) => !isAuthOrValidation(err) && count < 1,
   });
 }
@@ -123,13 +150,16 @@ export function useAccountBalance(accountId: string) {
     enabled: Boolean(accountId),
 
     queryFn: async () => {
+      const url = `/v1/accounts/${encodeURIComponent(accountId)}/balance`;
+      const raw = await http.get<AccountBalanceRawDTO>(url);
+
       const raw = await http.get<AccountBalanceRawDTO>(
         `/v1/accounts/${encodeURIComponent(accountId)}/balance`
       );
       return mapBalance(raw);
     },
 
-    staleTime: 15_000, // Refresh balance every 15 seconds
+    staleTime: 15_000,
     retry: (count, err) => !isAuthOrValidation(err) && count < 1,
   });
 }
