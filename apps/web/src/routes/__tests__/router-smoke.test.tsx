@@ -1,14 +1,17 @@
+// src/routes/__tests__/router-smoke.test.tsx
 // Türkçe Özet:
-// Router temel duman testi: /accounts yoluna gidildiğinde sayfa render olmalı.
+// Router için temel duman testi. /accounts rotasına gidildiğinde
+// Accounts sayfasının AppProviders (React Query + Toaster) ile birlikte
+// sorunsuz render olduğunu doğrular.
 
 import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
-import { screen, render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 
-// adjust these imports to your project structure
 import { RootLayout } from '../layouts/RootLayout';
 import { Accounts } from '../../pages/Accounts';
+import { AppProviders } from '../../providers/AppProviders';
 
 describe('Router smoke /accounts', () => {
   it('renders Accounts page', async () => {
@@ -17,15 +20,21 @@ describe('Router smoke /accounts', () => {
         {
           path: '/',
           element: <RootLayout />,
-          children: [
-            { path: 'accounts', element: <Accounts /> },
-          ],
+          children: [{ path: 'accounts', element: <Accounts /> }],
         },
       ],
-      { initialEntries: ['/accounts'] },
+      { initialEntries: ['/accounts'] }
     );
 
-    render(<RouterProvider router={router} />);
-    expect(await screen.findByText(/Accounts/i)).toBeInTheDocument();
+    // Wrap router with AppProviders so React Query etc. are available
+    render(
+      <AppProviders>
+        <RouterProvider router={router} />
+      </AppProviders>
+    );
+
+    // Navbar link'ini değil, sayfa başlığını (h1) hedefleyelim
+    const heading = await screen.findByRole('heading', { name: /Accounts/i });
+    expect(heading).toBeInTheDocument();
   });
 });
